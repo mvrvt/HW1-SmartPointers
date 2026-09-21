@@ -1,0 +1,72 @@
+# === macOS ===
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# === Редакторы / VS Code ===
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# === Окружение и секреты ===
+.env
+.env.*
+!.env.example
+
+# === Python / Виртуальные окружения ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Виртуальные окружения (venv, poetry, conda)
+.venv/
+venv/
+ENV/
+env/
+
+# === Jupyter Notebooks ===
+.ipynb_checkpoints
+*-checkpoint.py
+
+# === ML / Данные и веса моделей ===
+# Обычно тяжелые данные и чекпоинты не хранят в Git.
+# Если папки называются иначе, поправь пути под свой проект:
+data/
+datasets/
+models/
+checkpoints/
+runs/
+wandb/
+
+# Тяжелые форматы весов и датасетов
+*.pt
+*.pth
+*.onnx
+*.bin
+*.h5
+*.pkl
+*.parquet
