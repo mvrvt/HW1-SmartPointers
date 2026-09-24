@@ -43,7 +43,7 @@ public:
         return *this;
     }
 
-    // Методы доступа из ТЗ
+    // Методы доступа
     UnqPtr<T> Get(size_t index) const {
         CheckIndex(index);
         return UnqPtr<T>(new T(data_[index]));
