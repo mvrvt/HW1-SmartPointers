@@ -76,7 +76,7 @@ public:
         return size_;
     }
 
-    size_t GetCapacity() const noexcept override {
+    size_t GetCapacity() const noexcept  {
         return capacity_;
     }
 

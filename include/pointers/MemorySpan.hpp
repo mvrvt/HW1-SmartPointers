@@ -15,7 +15,7 @@ public:
 
     explicit MemorySpan(size_t size) : size_(size) {
         if (size_ > 0) 
-            data_ = newT[size_](); // value-initialization (все ячейки зануляются)
+            data_ = new T[size_](); // value-initialization (все ячейки зануляются)
     }
 
     ~MemorySpan() noexcept {
@@ -51,7 +51,7 @@ public:
 
     ShrdPtr<T> Copy(size_t index) const {
         CheckIndex(index);
-        return ShrdPtr<T>(UnqPtr<T>(new T(data_[index_])));
+        return ShrdPtr<T>(UnqPtr<T>(new T(data_[index])));
     }
 
     MsPtr<T> Locate(size_t index) {
@@ -66,11 +66,11 @@ public:
 
     // Оператор прямого доступа по индексу для MsPtr
     T& operator[](size_t index) {
-        return data_[index_];
+        return data_[index];
     }
 
     const T& operator[](size_t index) const {
-        return data_[index_];
+        return data_[index];
     }
 
 private:
