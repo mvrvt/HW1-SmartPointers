@@ -6,7 +6,7 @@
 
 template <typename T>
 class ShrdPtr {
- public:
+public:
     ShrdPtr() noexcept = default;
 
     // Создание из UnqPtr (забирает владение объектом)
@@ -27,7 +27,7 @@ class ShrdPtr {
             ++(*ref_count_);
     }
 
-    ShrdPtr operator=(const ShrdPtr& other) noexcept {
+    ShrdPtr& operator=(const ShrdPtr& other) noexcept {
         if (this != &other) {
             ReleaseRef();
             master_ = other.master_;
@@ -70,7 +70,7 @@ class ShrdPtr {
         ReleaseRef();
     }
 
- private:
+private:
     void ReleaseRef() noexcept {
         if (ref_count_ != nullptr) {
             --(*ref_count_);
