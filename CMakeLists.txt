@@ -32,6 +32,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_executable(smart_pointers_app 
     src/main.cpp
     tests/tests_all.cpp
+    tests/tests_unq_ptr.cpp
 )
 
 target_link_libraries(smart_pointers_app PRIVATE GTest::gtest)
