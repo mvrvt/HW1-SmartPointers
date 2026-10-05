@@ -1,13 +1,19 @@
 #pragma once
 
+#include <cassert> // assert'ы
 #include <cstddef>
 #include <utility>
 #include <concepts>
 
+
+// ========= UnqPtr<T> - единоличное владение одиночным объектом. =========
 template <typename T>
 class UnqPtr {
 public:
-    UnqPtr() noexcept = default; 
+    using ElementType = T;
+    using Pointer = T*;
+
+    UnqPtr() noexcept : ptr_(nullptr) {} // = UnqPtr() noexcept = default
     explicit UnqPtr(T* ptr) noexcept : ptr_(ptr) {}
     
     ~UnqPtr() noexcept {
@@ -28,6 +34,7 @@ public:
     }
 
     // Подтипизация (ковариантность для наследников U -> T).
+    // UnqPtr<Derived> -> UnqPtr<Base>, UnqPtr<T> -> UnqPtr<const T>
     template <typename U>
     requires std::convertible_to<U*, T*>
     UnqPtr(UnqPtr<U>&& other) noexcept : ptr_(other.Release()) {}
@@ -37,6 +44,11 @@ public:
     UnqPtr& operator=(UnqPtr<U>&& other) noexcept {
         Reset(other.Release());
         return *this; 
+    }
+
+    UnqPtr& operator=(std::nullptr_t) noexcept {
+        Reset();
+        return *this;
     }
 
     T& operator*()  const noexcept { return *ptr_; }
@@ -109,3 +121,4 @@ public:
 private:
     T* ptr_ = nullptr;
 };
+

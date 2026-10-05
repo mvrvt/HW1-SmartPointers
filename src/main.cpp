@@ -123,6 +123,13 @@ int main() {
       continue;
     }
 
+    int* ptr = new int(5);
+
+    UnqPtr<int> p(new int(52));
+
+    // p.Reset(new int(67));
+    p.Reset();
+
     switch (choice) {
       case 1:
         RunAllGoogleTests();
