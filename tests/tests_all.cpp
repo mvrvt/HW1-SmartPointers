@@ -13,63 +13,10 @@
 #include "pointers/UnqPtr.hpp"
 #include "test_helpers.hpp"
 
-// Тесты UnqPtr перенесены в tests/test_unq_ptr.cpp
+// Тесты UnqPtr — в tests/tests_unq_ptr.cpp, тесты ShrdPtr — в tests/tests_shrd_ptr.cpp
 
 // ============================================================================
-// 1. Тесты ShrdPtr<T> (Децентрализованное разделяемое владение)
-// ============================================================================
-
-TEST(ShrdPtrTest, ReferenceCountingAndCleanup) {
-    InstanceTracker::alive_count = 0;
-    {
-        ShrdPtr<InstanceTracker> ptr1(UnqPtr<InstanceTracker>(new InstanceTracker(55)));
-        EXPECT_EQ(InstanceTracker::alive_count, 1);
-        EXPECT_EQ(ptr1.UseCount(), 1);
-        EXPECT_EQ(ptr1->value, 55);
-
-        {
-            ShrdPtr<InstanceTracker> ptr2 = ptr1;
-            EXPECT_EQ(ptr1.UseCount(), 2);
-            EXPECT_EQ(ptr2.UseCount(), 2);
-            EXPECT_EQ(InstanceTracker::alive_count, 1);
-
-            ShrdPtr<InstanceTracker> ptr3;
-            ptr3 = ptr2;
-            EXPECT_EQ(ptr1.UseCount(), 3);
-            EXPECT_EQ(ptr3.UseCount(), 3);
-        }
-
-        EXPECT_EQ(ptr1.UseCount(), 1);
-        EXPECT_EQ(InstanceTracker::alive_count, 1);
-    }
-    EXPECT_EQ(InstanceTracker::alive_count, 0);
-}
-
-TEST(ShrdPtrTest, MoveSemanticsDoesNotChangeCounter) {
-    InstanceTracker::alive_count = 0;
-    {
-        ShrdPtr<InstanceTracker> ptr1(UnqPtr<InstanceTracker>(new InstanceTracker(77)));
-        EXPECT_EQ(ptr1.UseCount(), 1);
-
-        ShrdPtr<InstanceTracker> ptr2 = std::move(ptr1);
-        EXPECT_EQ(ptr1.Get(), nullptr);
-        EXPECT_EQ(ptr1.UseCount(), 0);
-        ASSERT_NE(ptr2.Get(), nullptr);
-        EXPECT_EQ(ptr2.UseCount(), 1);
-        EXPECT_EQ(InstanceTracker::alive_count, 1);
-    }
-    EXPECT_EQ(InstanceTracker::alive_count, 0);
-}
-
-TEST(ShrdPtrTest, SelfAssignmentIsSafe) {
-    ShrdPtr<int> ptr(UnqPtr<int>(new int(42)));
-    ptr = ptr;  // Не должно привести к падению или утечке
-    EXPECT_EQ(ptr.UseCount(), 1);
-    EXPECT_EQ(*ptr, 42);
-}
-
-// ============================================================================
-// 2. Тесты MemorySpan<T> и MsPtr<T> (Безопасная арифметика)
+// 1. Тесты MemorySpan<T> и MsPtr<T> (Безопасная арифметика)
 // ============================================================================
 
 TEST(MemorySpanTest, CreationAndElementAccess) {
@@ -159,7 +106,7 @@ TEST(MsPtrTest, BoundaryProtectionThrows) {
 }
 
 // ============================================================================
-// 3. Тесты ArraySequence<T> (Контейнер на UnqPtr<T[]>)
+// 2. Тесты ArraySequence<T> (Контейнер на UnqPtr<T[]>)
 // ============================================================================
 
 TEST(ArraySequenceTest, DefaultAndEmptyState) {

@@ -1,10 +1,10 @@
 #pragma once
 
-#include <cassert> // assert'ы
-#include <concepts>
-#include <cstddef>
-#include <type_traits>
-#include <utility>
+#include <cassert>     // assert'ы
+#include <concepts>    // std::convertible_to
+#include <cstddef>     // size_t & std::nullptr_t
+#include <type_traits> // std::is_array_v, std::is_bounded_array_v, std::remove_extent_t
+#include <utility>     // std::exchange, std::swap, std::forward
 
 // ========== UnqPtr<T> - единоличное владение одиночным объектом. ==========
 template <typename T>
