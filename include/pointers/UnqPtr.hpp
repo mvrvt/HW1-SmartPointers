@@ -2,7 +2,7 @@
 
 #include <cassert>     // assert'ы
 #include <concepts>    // std::convertible_to
-#include <cstddef>     // size_t & std::nullptr_t
+#include <cstddef>     // size_t, std::nullptr_t
 #include <type_traits> // std::is_array_v, std::is_bounded_array_v, std::remove_extent_t
 #include <utility>     // std::exchange, std::swap, std::forward
 
@@ -10,7 +10,7 @@
 template <typename T>
 class UnqPtr {
 public:
-    using ElementType = T;
+    using ElementType = T; 
     using Pointer = T*;
 
     UnqPtr() noexcept : ptr_(nullptr) {} // = UnqPtr() noexcept = default

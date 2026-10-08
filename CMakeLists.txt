@@ -47,6 +47,8 @@ add_executable(unit_tests
     tests/tests_all.cpp
     tests/tests_unq_ptr.cpp
     tests/tests_shrd_ptr.cpp
+    tests/tests_ms_ptr.cpp
+    tests/tests_memory_span.cpp
 )
 # gtest_main содержит готовую функцию main(), которая запускает все тесты
 target_link_libraries(unit_tests PRIVATE smart_pointers GTest::gtest_main)

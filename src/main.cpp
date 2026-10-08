@@ -18,9 +18,9 @@ void RunInteractiveSandbox() {
     constexpr size_t kSpanSize = 5;
     MemorySpan<int> span(kSpanSize);
 
-    // Инициализируем значениями 10, 20, 30, 40, 50
+    // Инициализируем значениями 10, 20, 30, 40, 50 (через MsPtr: span[i] снаружи недоступен)
     for (size_t i = 0; i < kSpanSize; ++i)
-        span[i] = static_cast<int>((i + 1) * 10);
+        *span.Locate(i) = static_cast<int>((i + 1) * 10);
 
     MsPtr<int> ptr = span.Locate(0);
     std::cout << "Создан MemorySpan размера " << kSpanSize << ".\n";

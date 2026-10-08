@@ -7,106 +7,13 @@
 
 #include "ArraySequence.hpp"
 #include "Sequence.hpp"
-#include "pointers/MemorySpan.hpp"
-#include "pointers/MsPtr.hpp"
-#include "pointers/ShrdPtr.hpp"
-#include "pointers/UnqPtr.hpp"
 #include "test_helpers.hpp"
 
-// Тесты UnqPtr — в tests/tests_unq_ptr.cpp, тесты ShrdPtr — в tests/tests_shrd_ptr.cpp
+// Тесты указателей — в tests/tests_unq_ptr.cpp, tests_shrd_ptr.cpp, tests_ms_ptr.cpp,
+// tests_memory_span.cpp. Здесь — тесты контейнера ArraySequence.
 
 // ============================================================================
-// 1. Тесты MemorySpan<T> и MsPtr<T> (Безопасная арифметика)
-// ============================================================================
-
-TEST(MemorySpanTest, CreationAndElementAccess) {
-    constexpr std::size_t kSize = 5;
-    MemorySpan<int> span(kSize);
-    EXPECT_EQ(span.Size(), kSize);
-
-    for (std::size_t i = 0; i < kSize; ++i) {
-        span[i] = static_cast<int>(i * 10);
-    }
-
-    UnqPtr<int> unq_copy = span.Get(2);
-    EXPECT_EQ(*unq_copy, 20);
-
-    ShrdPtr<int> shrd_copy = span.Copy(4);
-    EXPECT_EQ(*shrd_copy, 40);
-
-    // Выход за границы в Get и Copy
-    EXPECT_THROW(span.Get(10), std::out_of_range);
-    EXPECT_THROW(span.Copy(10), std::out_of_range);
-}
-
-TEST(MsPtrTest, ArithmeticAndNavigation) {
-    constexpr std::size_t kSize = 6;
-    MemorySpan<int> span(kSize);
-    for (std::size_t i = 0; i < kSize; ++i) {
-        span[i] = static_cast<int>(i + 1);
-    }
-
-    MsPtr<int> it = span.Locate(0);
-    EXPECT_EQ(*it, 1);
-
-    // Префиксный и постфиксный инкремент
-    EXPECT_EQ(*(++it), 2);
-    EXPECT_EQ(*(it++), 2);
-    EXPECT_EQ(*it, 3);
-
-    // Сложение со смещением
-    MsPtr<int> advanced = it + 2;
-    EXPECT_EQ(*advanced, 5);
-
-    // Разность указателей
-    EXPECT_EQ(advanced - it, 2);
-    EXPECT_EQ(it - advanced, -2);
-
-    // Оператор индексации
-    EXPECT_EQ(it[1], 4);
-    EXPECT_EQ(it[-1], 2);
-}
-
-TEST(MsPtrTest, Comparisons) {
-    MemorySpan<int> span(5);
-    MsPtr<int> first = span.Locate(1);
-    MsPtr<int> second = span.Locate(3);
-    MsPtr<int> first_dup = span.Locate(1);
-
-    EXPECT_TRUE(first == first_dup);
-    EXPECT_TRUE(first != second);
-    EXPECT_TRUE(first < second);
-    EXPECT_TRUE(second > first);
-    EXPECT_TRUE(first <= first_dup);
-    EXPECT_TRUE(first >= first_dup);
-}
-
-TEST(MsPtrTest, BoundaryProtectionThrows) {
-    MemorySpan<int> span(4);
-    MsPtr<int> it = span.Locate(0);
-
-    // Шаг влево от нуля
-    EXPECT_THROW(it - 1, std::out_of_range);
-    EXPECT_THROW(it -= 1, std::out_of_range);
-
-    // Шаг вправо за пределы size
-    EXPECT_THROW(it + 10, std::out_of_range);
-
-    // Позиция size (one-past-the-end) валидна для итератора, но не для чтения!
-    MsPtr<int> end_it = span.Locate(4);
-    EXPECT_TRUE(end_it == span.Locate(4));
-    EXPECT_THROW(*end_it, std::out_of_range);
-    EXPECT_THROW(end_it.operator->(), std::out_of_range);
-
-    // Запрет сравнения или вычитания указателей из РАЗНЫХ span
-    MemorySpan<int> another_span(4);
-    MsPtr<int> other_it = another_span.Locate(0);
-    EXPECT_THROW(it - other_it, std::invalid_argument);
-    EXPECT_THROW((void)(it < other_it), std::invalid_argument);
-}
-
-// ============================================================================
-// 2. Тесты ArraySequence<T> (Контейнер на UnqPtr<T[]>)
+// Тесты ArraySequence<T> (Контейнер на UnqPtr<T[]>)
 // ============================================================================
 
 TEST(ArraySequenceTest, DefaultAndEmptyState) {
