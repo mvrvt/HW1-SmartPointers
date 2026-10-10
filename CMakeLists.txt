@@ -40,11 +40,23 @@ add_executable(smart_pointers_app
 )
 target_link_libraries(smart_pointers_app PRIVATE smart_pointers)
 
+# ---------- Нагрузочные тесты (бенчмарки) ----------
+# Замеры имеют смысл только с оптимизацией и без assert'ов, поэтому -O2 и NDEBUG
+# включены для бенчмарков всегда, независимо от типа сборки (Debug / Release)
+add_executable(benchmarks
+    benchmarks/main.cpp
+    benchmarks/Benchmarks.cpp
+    benchmarks/AllocationCounter.cpp
+)
+target_link_libraries(benchmarks PRIVATE smart_pointers)
+target_compile_options(benchmarks PRIVATE -O2)
+target_compile_definitions(benchmarks PRIVATE NDEBUG)
+
 # ---------- Тесты ----------
 enable_testing()
 
 add_executable(unit_tests
-    tests/tests_all.cpp
+    tests/tests_array_sequence.cpp
     tests/tests_unq_ptr.cpp
     tests/tests_shrd_ptr.cpp
     tests/tests_ms_ptr.cpp

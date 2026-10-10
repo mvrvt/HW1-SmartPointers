@@ -1,12 +1,15 @@
 #pragma once
 
-#include <cstddef>
-#include <stdexcept>
-#include <utility>
+#include <cstddef>    // size_t
+#include <stdexcept>  // std::out_of_range, std::invalid_argument
+#include <utility>    // std::move, std::exchange, std::swap
 
 #include "pointers/UnqPtr.hpp"
 #include "Sequence.hpp"
 
+// ========== ArraySequence<T> — динамический массив на UnqPtr<T[]> ==========
+// Контейнер для проверки умных указателей: буфером владеет UnqPtr<T[]>,
+// поэтому своего delete[] здесь нет. Ёмкость растёт вдвое при нехватке места.
 template <typename T>
 class ArraySequence : public Sequence<T> {
 public:
