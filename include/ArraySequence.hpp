@@ -18,75 +18,62 @@ public:
 
     explicit ArraySequence(size_t count) : size_(count), capacity_(count) {
         if (capacity_ > 0)
-            buffer_.Reset(new T[capacity_]()); // value-initialization 
+            buffer_ = MakeUnq<T[]>(capacity_);
     }
 
+    // Копия n элементов из обычного массива items. 
     ArraySequence(const T* items, size_t count) {
         if (items == nullptr && count > 0) 
-            throw std::invalid_argument("Cannot initialize from nullptr with non-zero count");
-        if (count > 0) {
-            size_ = count;
-            capacity_ = count; 
-            buffer_.Reset(new T[capacity_]());
-            for (size_t i = 0; i < size_; ++i) {
-                buffer_[i] = items[i];
-            }
-        }
+            throw std::invalid_argument("ArraySequence: items is nullptr");
+        if (count == 0) 
+            return;
+        buffer_ = MakeUnq<T[]>(count);
+        size_ = count; 
+        capacity_ = count;
+        for (size_t i = 0; i < count; ++i) 
+            buffer_[i] = items[i];
     }
 
-    // Deep copying 
+    // Deep copying (у копии свой буфер)
     ArraySequence(const ArraySequence& other) : size_(other.size_), capacity_(other.capacity_) {
-        if (capacity_ > 0) {
-            buffer_.Reset(new T[capacity_]());
-            for (size_t i = 0; i < size_; ++i) {
-                buffer_[i] = other.buffer_[i];
-            }
-        }
+        if (capacity_ > 0) 
+            buffer_ = MakeUnq<T[]>(capacity_);
+        for (size_t i = 0; i < size_; ++i) 
+            buffer_[i] = other.buffer_[i];
     }
 
+    // Copy-and-swap: если копирование бросит исключение, *this не изменится
     ArraySequence& operator=(const ArraySequence& other) {
-        if (this != &other){
-            ArraySequence temp(other);
-            Swap(temp);
+        if (this != &other) {
+            ArraySequence copy(other);
+            Swap(copy);
         }
         return *this; 
     }
 
-    // Move semantics
     ArraySequence(ArraySequence&& other) noexcept 
-        : buffer_(std::move(other.buffer_)),
-          size_(other.size_),
-          capacity_(other.capacity_) {
-        other.size_ = 0;
-        other.capacity_ = 0;
-    }
+        : buffer_(std::move(other.buffer_)), 
+          size_(std::exchange(other.size_, 0)),
+          capacity_(std::exchange(other.capacity_, 0)) {}
 
     ArraySequence& operator=(ArraySequence&& other) noexcept {
         if (this != &other) {
             buffer_ = std::move(other.buffer_);
-            size_ = other.size_;
-            capacity_ = other.capacity_;
-            other.size_ = 0;
-            other.capacity_ = 0;
+            size_ = std::exchange(other.size_, 0);
+            capacity_ = std::exchange(other.capacity_, 0);
         }
         return *this;
     }
 
-    // Деструктор: buffer_ автоматически вызовет delete[] ptr_ 
+    // Буфер освобождает деструктор поля UnqPtr<T[]>
     ~ArraySequence() override = default;
-    
-    size_t GetLength() const noexcept override {
-        return size_;
-    }
 
-    size_t GetCapacity() const noexcept  {
-        return capacity_;
-    }
+    // Информация
+    size_t GetLength() const noexcept override { return size_; }
+    size_t GetCapacity() const noexcept  { return capacity_; }
+    bool IsEmpty() const noexcept override { return size_ == 0; }
 
-    bool IsEmpty() const noexcept override {
-        return size_ == 0;
-    }
-
+    // Доступ с проверкой (бросает out_of_range)
     const T& Get(size_t index) const override {
         CheckIndex(index);
         return buffer_[index];
@@ -117,6 +104,7 @@ public:
         return buffer_[size_ - 1];
     }
 
+    // Доступ без проверки (как у std::vector::operator[])
     const T& operator[](size_t index) const override {
         return buffer_[index];
     }
@@ -125,20 +113,21 @@ public:
         return buffer_[index];
     }
 
-    void Append(const T& item) override {
+    void Append(const T& item) override { //TODO: объясни почему мы изменили Append()? Что в нём нас не устраивало и что в нём было неверно?
+        T value = item;
         EnsureCapacity();
-        buffer_[size_] = item;
+        buffer_[size_] = std::move(value);
         ++size_;
     }
 
     void InsertAt(const T& item, size_t index) override {
         if (index > size_) 
-            throw std::out_of_range("Insert index is out of bounds");
+            throw std::out_of_range("ArraySequence::InsertAt: insert index is out of bounds");
+        T value = item;
         EnsureCapacity();
-        for (size_t i = size_; i > index; --i) {
+        for (size_t i = size_; i > index; --i) 
             buffer_[i] = std::move(buffer_[i - 1]);
-        }
-        buffer_[index] = item;
+        buffer_[index] = std::move(value);
         ++size_;
     }
 
@@ -148,9 +137,8 @@ public:
 
     void RemoveAt(size_t index) override {
         CheckIndex(index);
-        for (size_t i = index; i < size_ - 1; ++i) {
+        for (size_t i = index; i + 1  < size_; ++i) 
             buffer_[i] = std::move(buffer_[i + 1]);
-        }
         buffer_[size_ - 1] = T();
         --size_;
     }
@@ -158,39 +146,33 @@ public:
     void Reserve(size_t new_capacity) {
         if (new_capacity <= capacity_)
             return;
-        UnqPtr<T[]> new_buffer(new T[new_capacity]());
+        UnqPtr<T[]> new_buffer = MakeUnq<T[]>(new_capacity);
         for (size_t i = 0; i < size_; ++i) 
             new_buffer[i] = std::move(buffer_[i]);
-        buffer_ = std::move(new_buffer);
+        buffer_ = std::move(new_buffer); // старый буфер удалит UnqPtr
         capacity_ = new_capacity;
     }
 
     void Swap(ArraySequence& other) noexcept {
-        UnqPtr<T[]> temp_buffer = std::move(buffer_);
-        buffer_ = std::move(other.buffer_);
-        other.buffer_ = std::move(temp_buffer);
-
+        buffer_.Swap(other.buffer_);
         std::swap(size_, other.size_);
         std::swap(capacity_, other.capacity_);
     }
 
-
-
 private:
     void CheckIndex(size_t index) const {
         if (index >= size_)
-            throw std::out_of_range("Index is out of range");
+            throw std::out_of_range("ArraySequence::CheckIndex: index is out of range");
     }
 
     void CheckEmpty() const {
         if (size_ == 0)
-            throw std::out_of_range("Sequence is empty");
+            throw std::out_of_range("ArraySequence::CheckEmpty: Sequence is empty");
     }
 
     void EnsureCapacity() {
-        if (size_ == capacity_) {
+        if (size_ == capacity_) 
             Reserve(capacity_ == 0 ? 4 : capacity_ * 2);
-        }
     }
 
     UnqPtr<T[]> buffer_;

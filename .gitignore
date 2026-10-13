@@ -14,3 +14,6 @@ cmake-build-*/
 # clangd
 .cache/
 compile_commands.json
+
+# Виртуальное окружение Python (для benchmarks/plot.py)
+.venv/
