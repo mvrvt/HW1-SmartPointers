@@ -7,7 +7,7 @@
 #include "pointers/UnqPtr.hpp"
 #include "Sequence.hpp"
 
-// ========== ArraySequence<T> — динамический массив на UnqPtr<T[]> ==========
+// ========== ArraySequence<T> - динамический массив на UnqPtr<T[]> ==========
 // Контейнер для проверки умных указателей: буфером владеет UnqPtr<T[]>,
 // поэтому своего delete[] здесь нет. Ёмкость растёт вдвое при нехватке места.
 template <typename T>
@@ -113,7 +113,7 @@ public:
         return buffer_[index];
     }
 
-    void Append(const T& item) override { //TODO: объясни почему мы изменили Append()? Что в нём нас не устраивало и что в нём было неверно?
+    void Append(const T& item) override { 
         T value = item;
         EnsureCapacity();
         buffer_[size_] = std::move(value);

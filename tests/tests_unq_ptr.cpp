@@ -23,10 +23,10 @@ UnqPtr<int> MakeEmptyUnqPtr() {
 
 // ============================================================================
 // 0. Проверки во время компиляции
-// is_constructible_v<A, B> — можно ли написать  A x(b);   (явно)
-// is_convertible_v<B, A>   — можно ли написать  A x = b;  (неявно)
-// UnqPtr<X>&&  — значит "передали через std::move"
-// UnqPtr<X>&   — значит "передали обычную переменную" (это была бы копия)
+// is_constructible_v<A, B> - можно ли написать  A x(b);   (явно)
+// is_convertible_v<B, A>   - можно ли написать  A x = b;  (неявно)
+// UnqPtr<X>&&  - значит "передали через std::move"
+// UnqPtr<X>&   - значит "передали обычную переменную" (это была бы копия)
 // ============================================================================
 
 // Копировать нельзя
@@ -62,6 +62,8 @@ static_assert(!std::is_assignable_v<UnqPtr<DerivedEntity>&, UnqPtr<BaseEntity>&&
 static_assert(!std::is_constructible_v<UnqPtr<UnrelatedEntity>, UnqPtr<BaseEntity>&&>);  // не родственники
 static_assert(!std::is_constructible_v<UnqPtr<BaseEntity>, UnqPtr<PrivateDerivedEntity>&&>);
 static_assert(!std::is_constructible_v<UnqPtr<BaseEntity>, UnqPtr<DerivedEntity>&>);      // без move
+static_assert(!std::is_constructible_v<UnqPtr<NonVirtualBase>, UnqPtr<NonVirtualDerived>&&>);  // нет virtual ~Base()
+static_assert(!std::is_assignable_v<UnqPtr<NonVirtualBase>&, UnqPtr<NonVirtualDerived>&&>);
 
 // const: добавить можно, убрать нельзя
 static_assert(std::is_constructible_v<UnqPtr<const int>, UnqPtr<int>&&>);
@@ -73,7 +75,7 @@ static_assert(!std::is_constructible_v<UnqPtr<BaseEntity[]>, UnqPtr<DerivedEntit
 static_assert(std::is_constructible_v<UnqPtr<const int[]>, UnqPtr<int[]>&&>);
 static_assert(!std::is_constructible_v<UnqPtr<int>, UnqPtr<int[]>&&>);  // массив -> не массив
 
-// Псевдонимы типов: у массива ElementType — тип элемента, без []
+// Псевдонимы типов: у массива ElementType - тип элемента, без []
 static_assert(std::is_same_v<UnqPtr<int>::ElementType, int>);
 static_assert(std::is_same_v<UnqPtr<int[]>::ElementType, int>);
 static_assert(std::is_same_v<UnqPtr<int[]>::Pointer, int*>);
@@ -376,7 +378,7 @@ TEST(UnqPtrTest, MakeUnqWithoutArgumentsGivesZero) {
 }
 
 // ============================================================================
-// 6. UnqPtr<T[]> — массивы
+// 6. UnqPtr<T[]> - массивы
 // ============================================================================
 
 TEST(UnqPtrArrayTest, DefaultAndNullptrAreEmpty) {

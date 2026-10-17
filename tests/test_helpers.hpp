@@ -64,3 +64,8 @@ class UnrelatedEntity {};
 
 // Закрытое наследование: снаружи DerivedEntity* -> BaseEntity* недоступно
 class PrivateDerivedEntity : private BaseEntity {};
+
+// Базовый класс БЕЗ виртуального деструктора: upcast к нему должен быть запрещён,
+// иначе delete через NonVirtualBase* вызвал бы только ~NonVirtualBase() (UB)
+class NonVirtualBase {};
+class NonVirtualDerived : public NonVirtualBase {};

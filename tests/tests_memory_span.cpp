@@ -10,7 +10,7 @@
 #include "test_helpers.hpp"
 
 // Можно ли написать span[0]? Для MemorySpan ответ должен быть «нет»:
-// по ТЗ доступ к элементам — только через умные указатели.
+// по ТЗ доступ к элементам - только через умные указатели.
 template <typename Span>
 concept HasPublicIndexing = requires(Span& span) { span[0]; };
 
@@ -18,7 +18,7 @@ concept HasPublicIndexing = requires(Span& span) { span[0]; };
 // 0. Проверки во время компиляции
 // ============================================================================
 
-// Нет span[i] снаружи — только Get / Copy / Locate
+// Нет span[i] снаружи - только Get / Copy / Locate
 static_assert(!HasPublicIndexing<MemorySpan<int>>);
 
 // Копировать нельзя (единственный владелец элементов), перемещать можно, без исключений
@@ -82,7 +82,7 @@ TEST(MemorySpanTest, CreateFromArrayCopiesItems) {
 TEST(MemorySpanTest, CreateFromNullArray) {
     EXPECT_THROW(MemorySpan<int>(nullptr, 3), std::invalid_argument);
 
-    MemorySpan<int> empty(nullptr, 0);  // ноль элементов из nullptr — допустимо
+    MemorySpan<int> empty(nullptr, 0);  // ноль элементов из nullptr - допустимо
     EXPECT_TRUE(empty.IsEmpty());
 }
 
@@ -96,7 +96,7 @@ TEST(MemorySpanTest, WorksWithStrings) {
 }
 
 // ============================================================================
-// 2. Get — UnqPtr на независимую копию элемента
+// 2. Get - UnqPtr на независимую копию элемента
 // ============================================================================
 
 TEST(MemorySpanTest, GetReturnsUnqPtrToCopy) {
@@ -132,7 +132,7 @@ TEST(MemorySpanTest, GetOutOfRangeThrows) {
 }
 
 // ============================================================================
-// 3. Copy — ShrdPtr на копию элемента
+// 3. Copy - ShrdPtr на копию элемента
 // ============================================================================
 
 TEST(MemorySpanTest, CopyReturnsShrdPtrToCopy) {
@@ -165,7 +165,7 @@ TEST(MemorySpanTest, CopyOutOfRangeThrows) {
 }
 
 // ============================================================================
-// 4. Locate, Begin, End — MsPtr на сам элемент
+// 4. Locate, Begin, End - MsPtr на сам элемент
 // ============================================================================
 
 TEST(MemorySpanTest, LocateGivesAccessToElementItself) {
@@ -178,7 +178,7 @@ TEST(MemorySpanTest, LocateGivesAccessToElementItself) {
 
 TEST(MemorySpanTest, LocateAllowsEndPosition) {
     MemorySpan<int> span(3);
-    EXPECT_NO_THROW(span.Locate(3));             // Size() — позиция «за последним»
+    EXPECT_NO_THROW(span.Locate(3));             // Size() - позиция «за последним»
     EXPECT_TRUE(span.Locate(3).IsEnd());
     EXPECT_THROW(span.Locate(4), std::out_of_range);
     EXPECT_THROW(span.Locate(100), std::out_of_range);

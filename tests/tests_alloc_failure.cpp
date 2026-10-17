@@ -12,7 +12,7 @@
 // ============================================================================
 // Тесты поведения ShrdPtr при нехватке памяти.
 //
-// Единственное место в ShrdPtr, где может вылететь исключение, — new size_t(1)
+// Единственное место в ShrdPtr, где может вылететь исключение, - new size_t(1)
 // для счётчика. Проверяем, что в этот момент объект не теряется (нет утечки)
 // и ничего не удаляется дважды.
 //
@@ -38,7 +38,7 @@ static void* Allocate(std::size_t size) {
     return memory;
 }
 
-// Все варианты new берут память через malloc, все варианты delete отдают через free —
+// Все варианты new берут память через malloc, все варианты delete отдают через free -
 // иначе память, выделенная одной парой функций, освобождалась бы другой.
 void* operator new(std::size_t size) { return Allocate(size); }
 void* operator new[](std::size_t size) { return Allocate(size); }
@@ -58,7 +58,7 @@ TEST(ShrdPtrTest, FailedCounterAllocationLeavesObjectInUnqPtr) {
     UnqPtr<InstanceTracker> owner(new InstanceTracker(1));
 
     bool thrown = false;
-    fail_next_allocation = true;  // следующий new — это new size_t для счётчика
+    fail_next_allocation = true;  // следующий new - это new size_t для счётчика
     try {
         ShrdPtr<InstanceTracker> shared(std::move(owner));
     } catch (const std::bad_alloc&) {

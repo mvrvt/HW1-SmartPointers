@@ -70,7 +70,7 @@ TEST(ArraySequenceTest, CreateFromArray) {
 TEST(ArraySequenceTest, CreateFromNullArray) {
     EXPECT_THROW(ArraySequence<int>(nullptr, 5), std::invalid_argument);
 
-    ArraySequence<int> empty(nullptr, 0);  // ноль элементов из nullptr — допустимо
+    ArraySequence<int> empty(nullptr, 0);  // ноль элементов из nullptr - допустимо
     EXPECT_TRUE(empty.IsEmpty());
 }
 
@@ -138,10 +138,10 @@ TEST(ArraySequenceTest, AppendGrowsCapacityAndKeepsElements) {
 TEST(ArraySequenceTest, CapacityDoublesWhenFull) {
     ArraySequence<int> seq;
     seq.Append(1);
-    EXPECT_EQ(seq.GetCapacity(), 4u);  // первое выделение — 4 элемента
+    EXPECT_EQ(seq.GetCapacity(), 4u);  // первое выделение - 4 элемента
     for (int i = 0; i < 4; ++i)
         seq.Append(i);
-    EXPECT_EQ(seq.GetCapacity(), 8u);  // 5-й элемент не влез — ёмкость удвоилась
+    EXPECT_EQ(seq.GetCapacity(), 8u);  // 5-й элемент не влез - ёмкость удвоилась
 }
 
 TEST(ArraySequenceTest, PrependAddsToBeginning) {
@@ -160,7 +160,7 @@ TEST(ArraySequenceTest, InsertAtBeginningMiddleAndEnd) {
 
     seq.InsertAt("A", 0);  // в начало
     seq.InsertAt("C", 2);  // в середину
-    seq.InsertAt("E", 4);  // в конец (индекс == длине — допустимо)
+    seq.InsertAt("E", 4);  // в конец (индекс == длине - допустимо)
 
     EXPECT_EQ(seq.GetLength(), 5u);
     EXPECT_EQ(seq[0], "A");
@@ -178,7 +178,7 @@ TEST(ArraySequenceTest, InsertOutOfRangeThrowsAndKeepsSequence) {
 
 // ============================================================================
 // 4. Добавление элемента этой же последовательности (seq.Append(seq[0]))
-// item — ссылка внутрь буфера; перевыделение или сдвиг не должны его испортить
+// item - ссылка внутрь буфера; перевыделение или сдвиг не должны его испортить
 // ============================================================================
 
 TEST(ArraySequenceTest, AppendOwnElementWithReallocation) {
@@ -258,7 +258,7 @@ TEST(ArraySequenceTest, ReserveGrowsCapacityOnly) {
     EXPECT_EQ(seq.GetLength(), 3u);  // длина не изменилась
     EXPECT_EQ(seq.GetLast(), 30);
 
-    seq.Reserve(10);  // меньше текущей ёмкости — ничего не делает
+    seq.Reserve(10);  // меньше текущей ёмкости - ничего не делает
     EXPECT_EQ(seq.GetCapacity(), 50u);
 }
 

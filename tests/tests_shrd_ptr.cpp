@@ -12,7 +12,7 @@
 
 // Узел односвязного списка на ShrdPtr (для тестов head = head->next).
 // Имя отличается от ListNode из tests_unq_ptr.cpp: два разных класса
-// с одним именем в одной программе — нарушение правила одного определения (ODR).
+// с одним именем в одной программе - нарушение правила одного определения (ODR).
 struct SharedListNode {
     explicit SharedListNode(int value) : tracker(value) {}
 
@@ -27,11 +27,11 @@ ShrdPtr<int> MakeEmptyShrdPtr() {
 
 // ============================================================================
 // 0. Проверки во время компиляции
-// is_constructible_v<A, B> — можно ли написать  A x(b);   (явно)
-// is_convertible_v<B, A>   — можно ли написать  A x = b;  (неявно)
-// is_assignable_v<A&, B>   — можно ли написать  a = b;
-// X&&        — "передали через std::move"
-// const X&   — "передали обычную переменную" (копия) //TODO: разве копия? Копия это когда мы копируем элемент в память и работаем с копией, а тут у нас передача элемента по ссылке
+// is_constructible_v<A, B> - можно ли написать  A x(b);   (явно)
+// is_convertible_v<B, A>   - можно ли написать  A x = b;  (неявно)
+// is_assignable_v<A&, B>   - можно ли написать  a = b;
+// X&&        - "передали через std::move"
+// const X&   - "передали обычную переменную" (копия) //TODO: разве копия? Копия это когда мы копируем элемент в память и работаем с копией, а тут у нас передача элемента по ссылке
 // ============================================================================
 
 // Копировать и перемещать можно, и ничего из этого не бросает исключений
@@ -42,7 +42,7 @@ static_assert(std::is_nothrow_move_assignable_v<ShrdPtr<int>>);
 static_assert(std::is_nothrow_copy_constructible_v<ShrdPtr<int[]>>);
 static_assert(std::is_nothrow_move_assignable_v<ShrdPtr<int[]>>);
 
-// Размер — два указателя: адрес объекта и адрес счётчика (как у std::shared_ptr)
+// Размер - два указателя: адрес объекта и адрес счётчика (как у std::shared_ptr)
 static_assert(sizeof(ShrdPtr<int>) == 2 * sizeof(int*));
 static_assert(sizeof(ShrdPtr<int[]>) == 2 * sizeof(int*));
 
@@ -72,12 +72,14 @@ static_assert(std::is_assignable_v<ShrdPtr<BaseEntity>&, ShrdPtr<DerivedEntity>&
 static_assert(std::is_convertible_v<UnqPtr<DerivedEntity>&&, ShrdPtr<BaseEntity>>);
 static_assert(std::is_constructible_v<ShrdPtr<BaseEntity>, DerivedEntity*>);
 
-// ...а всё остальное нельзя
+// а всё остальное нельзя
 static_assert(!std::is_constructible_v<ShrdPtr<DerivedEntity>, const ShrdPtr<BaseEntity>&>);  // downcast
 static_assert(!std::is_assignable_v<ShrdPtr<DerivedEntity>&, const ShrdPtr<BaseEntity>&>);
 static_assert(!std::is_constructible_v<ShrdPtr<DerivedEntity>, UnqPtr<BaseEntity>&&>);
 static_assert(!std::is_constructible_v<ShrdPtr<UnrelatedEntity>, const ShrdPtr<BaseEntity>&>);  // не родственники
 static_assert(!std::is_constructible_v<ShrdPtr<BaseEntity>, const ShrdPtr<PrivateDerivedEntity>&>);
+static_assert(!std::is_constructible_v<ShrdPtr<NonVirtualBase>, const ShrdPtr<NonVirtualDerived>&>);  // нет virtual ~Base()
+static_assert(!std::is_constructible_v<ShrdPtr<NonVirtualBase>, UnqPtr<NonVirtualDerived>&&>);
 
 // const: добавить можно, убрать нельзя
 static_assert(std::is_constructible_v<ShrdPtr<const int>, const ShrdPtr<int>&>);
@@ -92,7 +94,7 @@ static_assert(std::is_constructible_v<ShrdPtr<const int[]>, int*>);
 static_assert(!std::is_constructible_v<ShrdPtr<int>, const ShrdPtr<int[]>&>);  // массив -> не массив
 static_assert(!std::is_constructible_v<ShrdPtr<int[]>, const ShrdPtr<int>&>);  // не массив -> массив
 
-// Псевдонимы типов: у массива ElementType — тип элемента, без []
+// Псевдонимы типов: у массива ElementType - тип элемента, без []
 static_assert(std::is_same_v<ShrdPtr<int>::ElementType, int>);
 static_assert(std::is_same_v<ShrdPtr<int>::Pointer, int*>);
 static_assert(std::is_same_v<ShrdPtr<int[]>::ElementType, int>);
@@ -233,7 +235,7 @@ TEST(ShrdPtrTest, CopiesInsideVector) {
 }
 
 // ============================================================================
-// 3. Перемещение: владелец меняется, счётчик — нет
+// 3. Перемещение: владелец меняется, счётчик - нет
 // ============================================================================
 
 TEST(ShrdPtrTest, MoveConstructorDoesNotChangeCounter) {
@@ -556,7 +558,7 @@ TEST(ShrdPtrTest, LastBaseOwnerDeletesDerivedObject) {
         EXPECT_EQ(BaseEntity::alive_entities, 1);
         EXPECT_EQ(base_ptr.UseCount(), 1u);
     }
-    EXPECT_EQ(BaseEntity::alive_entities, 0);  // удалён через Base* — нужен virtual ~BaseEntity
+    EXPECT_EQ(BaseEntity::alive_entities, 0);  // удалён через Base* - нужен virtual ~BaseEntity
 }
 
 TEST(ShrdPtrTest, BasePointerFromUnqPtrAndRawDerived) {
@@ -577,7 +579,7 @@ TEST(ShrdPtrTest, ConversionToConstPointer) {
     EXPECT_EQ(ptr.UseCount(), 2u);
     EXPECT_EQ(*const_ptr, 8);
 
-    *ptr = 9;  // меняем через неконстантный — видно через константный
+    *ptr = 9;  // меняем через неконстантный - видно через константный
     EXPECT_EQ(*const_ptr, 9);
 }
 
@@ -614,7 +616,7 @@ TEST(ShrdPtrTest, MakeShrdWithoutArgumentsGivesZero) {
 }
 
 // ============================================================================
-// 8. Циклические ссылки — известное ограничение подсчёта ссылок
+// 8. Циклические ссылки - известное ограничение подсчёта ссылок
 // ============================================================================
 
 TEST(ShrdPtrTest, CycleKeepsObjectsAliveUntilBroken) {
@@ -637,7 +639,7 @@ TEST(ShrdPtrTest, CycleKeepsObjectsAliveUntilBroken) {
 }
 
 // ============================================================================
-// 9. ShrdPtr<T[]> — массивы
+// 9. ShrdPtr<T[]> - массивы
 // ============================================================================
 
 TEST(ShrdPtrArrayTest, DefaultAndNullptrAreEmpty) {
@@ -721,7 +723,7 @@ TEST(ShrdPtrArrayTest, ResetVariants) {
     EXPECT_EQ(InstanceTracker::alive_count, 2);
     EXPECT_EQ(array.UseCount(), 1u);
 
-    array.Reset(array.Get());  // тот же массив — ничего не меняется
+    array.Reset(array.Get());  // тот же массив - ничего не меняется
     EXPECT_EQ(array.UseCount(), 1u);
     EXPECT_EQ(InstanceTracker::alive_count, 2);
 

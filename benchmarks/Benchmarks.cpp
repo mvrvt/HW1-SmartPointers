@@ -3,7 +3,7 @@
 #include <chrono>
 #include <fstream>
 #include <iomanip>
-#include <memory>   // std::unique_ptr, std::shared_ptr — только для сравнения (ТЗ это разрешает)
+#include <memory>   // std::unique_ptr, std::shared_ptr - только для сравнения
 #include <string>
 #include <vector>
 
@@ -19,8 +19,8 @@ using Clock = std::chrono::steady_clock;
 // Вспомогательные функции
 // ============================================================================
 
-// Не даёт оптимизатору выбросить «бесполезные» вычисления.
-// Пустая ассемблерная вставка «читает» value и «может изменить любую память» —
+// Не даёт оптимизатору выбросить "бесполезные" вычисления.
+// Пустая ассемблерная вставка "читает" value и «может изменить любую память» -
 // компилятор обязан честно посчитать value и не может склеить соседние итерации.
 // Тот же приём использует библиотека Google Benchmark (benchmark::DoNotOptimize).
 template <typename T>
@@ -32,7 +32,7 @@ double MillisecondsSince(Clock::time_point start) {
     return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
 }
 
-// На маленьких N один прогон длится наносекунды — таймер такое не измерит.
+// На маленьких N один прогон длится наносекунды - таймер такое не измерит.
 // Поэтому повторяем прогон, пока общее число операций не наберётся ~2 млн,
 // и делим время на число повторов.
 size_t RepeatsFor(size_t count) {
@@ -63,7 +63,7 @@ template <typename Handle>
 void Release(Handle&) {}
 
 // ============================================================================
-// Сценарий create: создать N объектов (каждый — отдельный new) и удалить их
+// Сценарий create: создать N объектов (каждый - отдельный new) и удалить их
 // ============================================================================
 
 template <typename Handle, typename Make>
@@ -205,8 +205,8 @@ BenchmarkConfig FullConfig() {
 
 BenchmarkConfig QuickConfig() {
     BenchmarkConfig config;
-    config.sizes = {10, 100, 1'000, 10'000, 100'000};
-    config.large_sizes = {10, 100, 1'000, 10'000, 100'000};
+    config.sizes = {10, 100, 1000, 10000, 100000};
+    config.large_sizes = {10, 100, 1000, 10000, 100000};
     return config;
 }
 
@@ -304,7 +304,7 @@ void PrintTimeTable(const std::vector<Measurement>& results, const std::string& 
         return;
 
     out << "\n" << title << "\n";
-    out << "  (последняя строка — время одного прогона на самом большом N, в миллисекундах)\n";
+    out << "  (последняя строка - время одного прогона на самом большом N, в миллисекундах)\n";
     out << std::setw(12) << "N";
     for (const std::string& variant : variants)
         out << std::setw(19) << variant;
@@ -320,7 +320,7 @@ void PrintTimeTable(const std::vector<Measurement>& results, const std::string& 
         out << "\n";
     }
 
-    // Общее время на самом большом N — чтобы было видно и абсолютные цифры
+    // Общее время на самом большом N - чтобы было видно и абсолютные цифры
     const size_t largest = CountsOf(results, scenario).back();
     out << std::setw(12) << "ms, max N";
     for (const std::string& variant : variants) {
@@ -338,9 +338,9 @@ void PrintMemoryTable(const std::vector<Measurement>& results, const std::string
     const size_t largest = CountsOf(results, scenario).back();
 
     out << "\n" << title << " (N = " << largest << ")\n";
-    // Заголовки столбцов латиницей: setw считает байты, а русская буква — это 2 байта
-    out << "  allocs/obj — выделений памяти на объект, heap — байт в куче на объект,\n"
-        << "  handle — байт на сам указатель, total — всего байт на объект, MB — всего на N объектов\n";
+    // Заголовки столбцов латиницей: setw считает байты, а русская буква - это 2 байта
+    out << "  allocs/obj - выделений памяти на объект, heap - байт в куче на объект,\n"
+        << "  handle - байт на сам указатель, total - всего байт на объект, MB - всего на N объектов\n";
     out << std::setw(18) << "variant" << std::setw(12) << "allocs/obj" << std::setw(12) << "heap"
         << std::setw(12) << "handle" << std::setw(12) << "total" << std::setw(12) << "MB" << "\n";
 
@@ -361,14 +361,14 @@ void PrintMemoryTable(const std::vector<Measurement>& results, const std::string
 
 void PrintTables(const std::vector<Measurement>& results, std::ostream& out) {
     out << "\n================ ВРЕМЯ (наносекунд на один объект / одну операцию) ================\n";
-    PrintTimeTable(results, "create", "create — создание и удаление N объектов", out);
-    PrintTimeTable(results, "access", "access — чтение *ptr через N указателей", out);
-    PrintTimeTable(results, "copy", "copy — копирование указателя N раз (счётчик ссылок +1/-1)", out);
-    PrintTimeTable(results, "traverse", "traverse — обход массива из N int", out);
+    PrintTimeTable(results, "create", "create - создание и удаление N объектов", out);
+    PrintTimeTable(results, "access", "access - чтение *ptr через N указателей", out);
+    PrintTimeTable(results, "copy", "copy - копирование указателя N раз (счётчик ссылок +1/-1)", out);
+    PrintTimeTable(results, "traverse", "traverse - обход массива из N int", out);
 
     out << "\n================ ПАМЯТЬ ================\n";
-    PrintMemoryTable(results, "create", "create — N отдельных объектов int", out);
-    PrintMemoryTable(results, "traverse", "traverse — массив из N int", out);
+    PrintMemoryTable(results, "create", "create - N отдельных объектов int", out);
+    PrintMemoryTable(results, "traverse", "traverse - массив из N int", out);
 }
 
 bool WriteCsv(const std::vector<Measurement>& results, const std::string& path) {

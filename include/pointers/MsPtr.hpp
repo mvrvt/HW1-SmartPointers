@@ -9,10 +9,10 @@
 template <typename T>
 class MemorySpan;
 
-// ========== MsPtr<T> — безопасный указатель с арифметикой внутри MemorySpan ==========
+// ========== MsPtr<T> - безопасный указатель с арифметикой внутри MemorySpan ==========
 // Привязан к одному конкретному MemorySpan и хранит номер элемента (индекс).
 // Может стоять на любом элементе [0, Size()) или на позиции «за последним» (Size()),
-// но никогда — за границами массива: любой выход за них бросает исключение.
+// но никогда - за границами массива: любой выход за них бросает исключение.
 // MsPtr НЕ владеет элементами: их хранит и удаляет MemorySpan.
 template <typename T>
 class MsPtr {
@@ -25,8 +25,8 @@ public:
     // Пустой указатель, ни к чему не привязан. Создать привязанный можно только через MemorySpan::Locate
     MsPtr() noexcept : span_(nullptr), index_(0) {}
 
-    // Копирование, присваивание и деструктор — те, что генерирует компилятор:
-    // MsPtr ничем не владеет, копия — просто ещё один указатель в тот же массив.
+    // Копирование, присваивание и деструктор - те, что генерирует компилятор:
+    // MsPtr ничем не владеет, копия - просто ещё один указатель в тот же массив.
 
     // ---------- Доступ к элементу: только к существующему, [0, Size()) ----------
     T& operator*() const {
@@ -39,7 +39,7 @@ public:
         return std::addressof((*span_)[index_]); //TODO: что это такое 
     }
 
-    // it[offset] — элемент, отстоящий от текущего на offset (как *(it + offset))
+    // it[offset] - элемент, отстоящий от текущего на offset (как *(it + offset))
     T& operator[](ptrdiff_t offset) const {
         CheckReadable(offset);
         return (*span_)[static_cast<size_t>(static_cast<ptrdiff_t>(index_) + offset)];
@@ -54,7 +54,7 @@ public:
     }
 
     MsPtr& operator-=(ptrdiff_t offset) {
-        // -PTRDIFF_MIN не помещается в ptrdiff_t (переполнение — UB),
+        // -PTRDIFF_MIN не помещается в ptrdiff_t (переполнение - UB),
         // а такой сдвиг в любом случае выводит за границы любого массива
         if (offset == std::numeric_limits<ptrdiff_t>::min()) //TODO: почему мы проверяем что offset не равен минимуму? Не разумнее ли будет сравнивать с -PTRDIFF_T *this - offset? 
             throw std::out_of_range("MsPtr moved out of MemorySpan bounds");
@@ -74,7 +74,7 @@ public:
     }
 
     //TODO: Вообще непонятно что это, для чего оно нужно и как оно работает
-    // 2 + it — как у обычного указателя
+    // 2 + it - как у обычного указателя
     friend MsPtr operator+(ptrdiff_t offset, const MsPtr& ptr) {
         return ptr + offset;
     }

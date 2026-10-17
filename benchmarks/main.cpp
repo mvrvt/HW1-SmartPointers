@@ -5,9 +5,9 @@
 #include "Benchmarks.hpp"
 
 // Запуск (из корня проекта):
-//   ./build/benchmarks                 — полный замер, N до 10^7 и 10^8 (около минуты)
-//   ./build/benchmarks --quick         — быстрый, N до 10^5 (пара секунд)
-//   ./build/benchmarks --out папка     — куда сохранить CSV (по умолчанию benchmark_results)
+//   ./build/benchmarks                 - полный замер, N до 10^7 и 10^8 (около минуты)
+//   ./build/benchmarks --quick         - быстрый, N до 10^5 (пара секунд)
+//   ./build/benchmarks --out папка     - куда сохранить CSV (по умолчанию benchmark_results)
 // Графики: python3 benchmarks/plot.py benchmark_results/results.csv
 int main(int argc, char* argv[]) {
     bool quick = false;
@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
     }
 
 #ifndef __OPTIMIZE__
-    std::cout << "ВНИМАНИЕ: бенчмарки собраны без оптимизации — цифры не показательны.\n";
+    std::cout << "ВНИМАНИЕ: бенчмарки собраны без оптимизации - цифры не показательны.\n";
 #endif
 
     std::cout << "Нагрузочное тестирование умных указателей ("

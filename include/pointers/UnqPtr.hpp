@@ -6,6 +6,12 @@
 #include <type_traits> // std::is_array_v, std::is_bounded_array_v, std::remove_extent_t
 #include <utility>     // std::exchange, std::swap, std::forward
 
+// Upcast U -> T безопасен, только если это тот же тип (с точностью до const)
+// или у T виртуальный деструктор: иначе delete через T* вызовет только ~T() (UB)
+template <typename U, typename T>
+concept SafeUpcast = std::is_same_v<std::remove_cv_t<U>, std::remove_cv_t<T>>
+                     || std::has_virtual_destructor_v<T>;
+
 // ========== UnqPtr<T> - единоличное владение одиночным объектом. ==========
 template <typename T>
 class UnqPtr {
@@ -15,9 +21,9 @@ public:
 
     UnqPtr() noexcept : ptr_(nullptr) {} // = UnqPtr() noexcept = default
     UnqPtr(std::nullptr_t) noexcept : ptr_(nullptr) {}
-    explicit UnqPtr(T* ptr) noexcept : ptr_(ptr) {}
+    explicit UnqPtr(T* ptr) noexcept : ptr_(ptr) {} 
     
-    ~UnqPtr() noexcept {
+    ~UnqPtr() noexcept { 
         Destroy(ptr_);
     }
 
@@ -26,7 +32,7 @@ public:
     UnqPtr& operator=(const UnqPtr&) = delete;
 
     // Move semantics
-    UnqPtr(UnqPtr&& other) noexcept : ptr_(other.Release()) {}
+    UnqPtr(UnqPtr&& other) noexcept : ptr_(other.Release()) {} 
 
     UnqPtr& operator=(UnqPtr&& other) noexcept {
         if (this != &other)
@@ -37,11 +43,11 @@ public:
     // Подтипизация (ковариантность для наследников U -> T).
     // UnqPtr<Derived> -> UnqPtr<Base>, UnqPtr<T> -> UnqPtr<const T>
     template <typename U>
-    requires std::convertible_to<U*, T*>
+    requires std::convertible_to<U*, T*> && SafeUpcast<U, T>
     UnqPtr(UnqPtr<U>&& other) noexcept : ptr_(other.Release()) {}
 
     template <typename U>
-    requires std::convertible_to<U*, T*>
+    requires std::convertible_to<U*, T*> && SafeUpcast<U, T>
     UnqPtr& operator=(UnqPtr<U>&& other) noexcept {
         Reset(other.Release());
         return *this; 
@@ -62,18 +68,18 @@ public:
         return ptr_; 
     }
 
-    T* Get() const noexcept { return ptr_; }
+    T* Get() const noexcept { return ptr_; } 
 
     explicit operator bool() const noexcept { return ptr_ != nullptr; }
 
-    [[nodiscard]] T* Release() noexcept {
+    [[nodiscard]] T* Release() noexcept { 
         T* temp = ptr_;
         ptr_ = nullptr;
         return temp;
     }
 
     void Reset(T* new_ptr = nullptr) noexcept {
-        if (ptr_ == new_ptr) // p.Reset(p.Get()) не должен удалить живой объект
+        if (ptr_ == new_ptr) // p.Reset(p.Get()) не должен удалить живой объект 
             return;
         Destroy(std::exchange(ptr_, new_ptr));
     }
@@ -82,8 +88,8 @@ public:
         std::swap(ptr_, other.ptr_);
     }
 
-    friend void swap(UnqPtr& lhs, UnqPtr& rhs) noexcept {
-        lhs.Swap(rhs);
+    friend void swap(UnqPtr& l, UnqPtr& r) noexcept { 
+        l.Swap(r);
     }
 
     bool operator==(const UnqPtr& other) const noexcept { return ptr_ == other.ptr_; }
@@ -98,7 +104,7 @@ private:
     T* ptr_ = nullptr; 
 };
 
-// ========== UnqPtr<T[]> — единоличное владение динамическим массивом ==========
+// ========== UnqPtr<T[]> - единоличное владение динамическим массивом ==========
 template <typename T>
 class UnqPtr<T[]> {
 public:
@@ -108,8 +114,7 @@ public:
     UnqPtr() noexcept = default;
     UnqPtr(std::nullptr_t) noexcept {}
 
-    // Только T* (или T* -> const T*), но НЕ Derived*:
-    // delete[] и индексация через Base* для массива Derived — UB
+    // Только T* (или T* -> const T*), но НЕ Derived*.
     template <typename U>
     requires std::convertible_to<U(*)[], T(*)[]>
     explicit UnqPtr(U* ptr) noexcept : ptr_(ptr) {}
@@ -175,8 +180,8 @@ public:
         std::swap(ptr_, other.ptr_);
     }
     
-    friend void swap(UnqPtr& lhs, UnqPtr& rhs) noexcept {
-        lhs.Swap(rhs);
+    friend void swap(UnqPtr& l, UnqPtr& r) noexcept {
+        l.Swap(r);
     }
 
     bool operator==(const UnqPtr& other) const noexcept { return ptr_ == other.ptr_; }
@@ -191,11 +196,11 @@ private:
     T* ptr_ = nullptr;
 };
 
-// Фабричные методы (аналог std::make_unique())
+// Фабричные методы (аналог std::make_unique()) 
 template <typename T, typename... Args>
 requires (!std::is_array_v<T>)
 [[nodiscard]] UnqPtr<T> MakeUnq(Args&&... args) {
-    return UnqPtr<T>(new T(std::forward<Args>(args)...));
+    return UnqPtr<T>(new T(std::forward<Args>(args)...)); 
 }
 
 // MakeUnq<int[]>(n): массив из n элементов, заполненных нулями/конструкторами по умолчанию

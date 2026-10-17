@@ -9,7 +9,7 @@
 #include "pointers/MsPtr.hpp"
 #include "test_helpers.hpp"
 
-// Заполняет span значениями 10, 20, 30, ... (через MsPtr — другого доступа нет)
+// Заполняет span значениями 10, 20, 30, ... (через MsPtr - другого доступа нет)
 void FillWithTens(MemorySpan<int>& span) {
     for (size_t i = 0; i < span.Size(); ++i)
         *span.Locate(i) = static_cast<int>((i + 1) * 10);
@@ -70,7 +70,7 @@ TEST(MsPtrTest, CopyIsIndependentPosition) {
     MsPtr<int> second = first;
 
     ++second;
-    EXPECT_EQ(first.GetIndex(), 1u);  // копия сдвинулась, оригинал — нет
+    EXPECT_EQ(first.GetIndex(), 1u);  // копия сдвинулась, оригинал - нет
     EXPECT_EQ(second.GetIndex(), 2u);
 }
 
@@ -124,10 +124,10 @@ TEST(MsPtrTest, IndexingOutOfBoundsThrows) {
     MemorySpan<int> span(4);
     MsPtr<int> ptr = span.Locate(1);
 
-    EXPECT_THROW(ptr[3], std::out_of_range);   // индекс 4 — это end, читать нельзя
+    EXPECT_THROW(ptr[3], std::out_of_range);   // индекс 4 - это end, читать нельзя
     EXPECT_THROW(ptr[-2], std::out_of_range);  // индекс -1
-    EXPECT_NO_THROW(ptr[2]);                    // индекс 3 — последний элемент
-    EXPECT_NO_THROW(ptr[-1]);                   // индекс 0 — первый элемент
+    EXPECT_NO_THROW(ptr[2]);                    // индекс 3 - последний элемент
+    EXPECT_NO_THROW(ptr[-1]);                   // индекс 0 - первый элемент
 }
 
 // ============================================================================
