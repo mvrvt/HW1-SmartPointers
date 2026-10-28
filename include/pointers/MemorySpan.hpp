@@ -1,24 +1,24 @@
 #pragma once
 
-#include <cstddef>
-#include <stdexcept>
-#include <utility>
+#include <cstddef>   // size_t 
+#include <stdexcept> // исключения
+#include <utility>   // std::move(), std::exchange()
 
 #include "UnqPtr.hpp"
 #include "ShrdPtr.hpp"
 #include "MsPtr.hpp"
 
 // ========== MemorySpan<T> - массив фиксированного размера ==========
-// Владеет своими элементами: хранит их в UnqPtr<T[]>, и тот удаляет их через delete[].
+// Владеет своими элементами: хранит их в UnqPtr<T[]>, и тот удаляет их через свой деструктор.
 // Прямого доступа к элементам (span[i]) снаружи нет - только через умные указатели:
-//   Get(i)    -> UnqPtr<T>  независимая копия элемента (единоличное владение)
-//   Copy(i)   -> ShrdPtr<T> копия элемента с разделяемым владением
+//   Get(i)    -> UnqPtr<T>  независимая копия элемента (единоличное владение) //TODO: Расскажи максимально подробно про эти методы Get(i), Copy(i) и Locate(i). Зачем и для чего они нужны? 
+//   Copy(i)   -> ShrdPtr<T> копия элемента с разделяемым владением //TODO: Для чего конкретно нужен Get(i) и что он делает? Он возвращает 
 //   Locate(i) -> MsPtr<T>   указатель на сам элемент внутри массива, с проверкой границ
 
 template <typename T>
 class MemorySpan {
 public:
-    using ElementType = T; //TODO: А почему у нас нет "using Pointer = T*", но есть ElementType?
+    using ElementType = T; //TODO: А почему у нас нет "using Pointer = T*", но есть ElementType? У нас же есть поле типа UnqPtr<T[]>, которое будет выделять данные на куче 
 
     MemorySpan() noexcept = default; 
 
@@ -54,7 +54,7 @@ public:
     // Методы доступа через умные указатели
     UnqPtr<T> Get(size_t index) const {
         CheckIndex(index); 
-        return MakeUnq<T>(data_[index]); //TODO: Правильно ли я понимаю, что мы получаем новый UnqPtr (не массив), ptr_ которого будет равен data_[index]?
+        return MakeUnq<T>(data_[index]); //TODO: Правильно ли я понимаю, что мы получаем новый UnqPtr (не массив), ptr_ которого будет равен data_[index]? При этом никакой ошибки не будет. Поскольку массив у нас UnqPtr<T[]>, а возвращаем мы UnqPtr<T> с значением T равным data_[index]. Мы не даём адрес элемента из массива, мы создаём новый UnqPtr<T> с значением как у data_[index]. Если я что-то понял не так - сообщи и объясни как правильно!
     }
 
     ShrdPtr<T> Copy(size_t index) const {
@@ -62,7 +62,7 @@ public:
         return MakeShrd<T>(data_[index]);
     }
 
-    // index == Size() разрешён: это позиция "за последним" (как End())
+    // index == Size() разрешён: это позиция "за последним" (как End()) 
     MsPtr<T> Locate(size_t index) {
         if (index > size_)
             throw std::out_of_range("MemorySpan::Locate: index is out of range");
@@ -72,7 +72,7 @@ public:
     MsPtr<T> Begin() noexcept { return MsPtr<T>(this, 0); }
     MsPtr<T> End() noexcept { return MsPtr<T>(this, size_); }
 
-    size_t Size() const noexcept {
+    size_t Size() const noexcept { //TODO: Давай переименуем этот метод в GetSize()? Так будет логичнее, это банальный геттер.
         return size_;
     }
 

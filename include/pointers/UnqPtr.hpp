@@ -97,7 +97,7 @@ public:
 
 private:
     static void Destroy(T* ptr) noexcept {
-        static_assert(sizeof(T) > 0, "UnqPtr can't delete an incomplete type");
+        static_assert(sizeof(T) > 0, "UnqPtr can't delete an incomplete type"); //TODO: Разобраться с этим моментом. Разве у нас создастся UnqPtr, если sizeof(T) будет равен нулю? 
         delete ptr;
     }
 

@@ -203,7 +203,7 @@ public:
     size_t UseCount() const noexcept {
         return ref_count_ != nullptr ? *ref_count_ : 0;
     }
- 
+
     // Reset() и Reset(nullptr) - перестать владеть массивом
     void Reset(std::nullptr_t = nullptr) noexcept {
         ShrdPtr empty;
