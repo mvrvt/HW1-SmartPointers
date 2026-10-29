@@ -1,8 +1,8 @@
 #pragma once
 
-#include <cassert>     // assert'ы
+#include <cassert>     // assert
 #include <concepts>    // std::convertible_to
-#include <cstddef>     // size_t, std::nullptr_t
+#include <cstddef>     // std::size_t, std::nullptr_t
 #include <type_traits> // std::is_array_v, std::is_bounded_array_v, std::remove_extent_t
 #include <utility>     // std::exchange, std::swap, std::forward
 
@@ -19,7 +19,7 @@ public:
     using ElementType = T; 
     using Pointer = T*;
 
-    UnqPtr() noexcept : ptr_(nullptr) {} // = UnqPtr() noexcept = default
+    UnqPtr() noexcept = default;  
     UnqPtr(std::nullptr_t) noexcept : ptr_(nullptr) {}
     explicit UnqPtr(T* ptr) noexcept : ptr_(ptr) {} 
     
@@ -31,7 +31,6 @@ public:
     UnqPtr(const UnqPtr&) = delete; 
     UnqPtr& operator=(const UnqPtr&) = delete;
 
-    // Move semantics
     UnqPtr(UnqPtr&& other) noexcept : ptr_(other.Release()) {} 
 
     UnqPtr& operator=(UnqPtr&& other) noexcept {
@@ -97,7 +96,7 @@ public:
 
 private:
     static void Destroy(T* ptr) noexcept {
-        static_assert(sizeof(T) > 0, "UnqPtr can't delete an incomplete type"); //TODO: Разобраться с этим моментом. Разве у нас создастся UnqPtr, если sizeof(T) будет равен нулю? 
+        static_assert(sizeof(T) > 0, "UnqPtr can't delete an incomplete type"); 
         delete ptr;
     }
 
@@ -152,7 +151,7 @@ public:
     }
 
     // Границы не проверяются: размер массива UnqPtr неизвестен
-    T& operator[](size_t index) const noexcept {
+    T& operator[](std::size_t index) const noexcept {
         assert(ptr_ != nullptr && "Indexing empty UnqPtr");
         return ptr_[index];
     }
@@ -196,16 +195,16 @@ private:
     T* ptr_ = nullptr;
 };
 
-// Фабричные методы (аналог std::make_unique()) 
+// Фабричные функции (аналог std::make_unique()) 
 template <typename T, typename... Args>
 requires (!std::is_array_v<T>)
-[[nodiscard]] UnqPtr<T> MakeUnq(Args&&... args) {
+[[nodiscard]] UnqPtr<T> MakeUnq(Args&&... args) { 
     return UnqPtr<T>(new T(std::forward<Args>(args)...)); 
 }
 
 // MakeUnq<int[]>(n): массив из n элементов, заполненных нулями/конструкторами по умолчанию
 template <typename T>
 requires std::is_unbounded_array_v<T>
-[[nodiscard]] UnqPtr<T> MakeUnq(size_t size) {
+[[nodiscard]] UnqPtr<T> MakeUnq(std::size_t size) {
     return UnqPtr<T>(new std::remove_extent_t<T>[size]());
 }

@@ -70,7 +70,6 @@ add_executable(alloc_failure_tests
 )
 target_link_libraries(alloc_failure_tests PRIVATE smart_pointers GTest::gtest_main)
 
-# Регистрируем каждый TEST(...) в ctest и во вкладке Testing в VS Code
 include(GoogleTest)
 gtest_discover_tests(unit_tests)
 gtest_discover_tests(alloc_failure_tests)

@@ -2,34 +2,31 @@
 
 #include <cassert>     // assert
 #include <concepts>    // std::convertible_to
-#include <cstddef>     // size_t, std::nullptr_t
+#include <cstddef>     // std::size_t, std::nullptr_t
 #include <type_traits> // std::is_array_v, std::is_unbounded_array_v
 #include <utility>     // std::exchange, std::swap, std::forward
 
 #include "UnqPtr.hpp"
 
 // ========== ShrdPtr<T> - разделяемое владение одиночным объектом ==========
-// Все копии, указывающие на один объект, делят один счётчик ссылок (size_t в куче).
-// Объект удаляется, когда умирает последняя копия. Удаляет его UnqPtr:
-// сам ShrdPtr никогда не вызывает delete для объекта.
+// Все копии, указывающие на один объект, делят один счётчик ссылок (std::size_t в куче).
 template <typename T>
 class ShrdPtr {
 public:
     using ElementType = T;
     using Pointer = T*;
 
-    ShrdPtr() noexcept : ptr_(nullptr), ref_count_(nullptr) {}
+    ShrdPtr() noexcept = default; 
     ShrdPtr(std::nullptr_t) noexcept : ptr_(nullptr), ref_count_(nullptr) {}
 
     // Забираем объект у UnqPtr (подходит и UnqPtr<Derived> для ShrdPtr<Base>).
-    // Сначала выделяем счётчик: если new бросит исключение,
-    // объектом всё ещё владеет owner, и он его удалит - утечки нет.
+    // Сначала выделяем счётчик: если new бросит исключение.
     template <typename U>
     requires std::convertible_to<U*, T*> && SafeUpcast<U, T>
     ShrdPtr(UnqPtr<U>&& owner) : ptr_(nullptr), ref_count_(nullptr) {
         if (!owner) 
             return; 
-        ref_count_ = new size_t(1);
+        ref_count_ = new std::size_t(1);
         ptr_ = owner.Release();
     }
 
@@ -59,7 +56,6 @@ public:
         : ptr_(std::exchange(other.ptr_, nullptr)),
           ref_count_(std::exchange(other.ref_count_, nullptr)) {}
     
-    // Одно присваивание на все случаи (copy-and-swap).
     ShrdPtr& operator=(ShrdPtr other) noexcept {
         Swap(other);
         return *this; 
@@ -82,7 +78,7 @@ public:
     T* Get() const noexcept { return ptr_; }
     explicit operator bool() const noexcept { return ptr_ != nullptr; }
 
-    size_t UseCount() const noexcept {
+    std::size_t UseCount() const noexcept {
         return ref_count_ != nullptr ? *ref_count_ : 0;
     }
 
@@ -90,7 +86,7 @@ public:
     void Reset() noexcept {
         ShrdPtr empty;
         Swap(empty);
-    } // здесь empty (со старым объектом) умирает и уменьшает его счётчик
+    } 
 
     
     void Reset(T* ptr) {
@@ -98,7 +94,7 @@ public:
             return;
         ShrdPtr new_owner(ptr);
         Swap(new_owner);
-    } // здесь new_owner со старым объектом умирает
+    } 
 
     void Swap(ShrdPtr& other) noexcept {
         std::swap(ptr_, other.ptr_);
@@ -133,7 +129,7 @@ private:
     }
 
     T* ptr_ = nullptr;
-    size_t* ref_count_ = nullptr;
+    std::size_t* ref_count_ = nullptr;
 };
 
 // ========== ShrdPtr<T[]> - разделяемое владение динамическим массивом ==========
@@ -152,7 +148,7 @@ public:
     ShrdPtr(UnqPtr<U[]>&& owner) : ptr_(nullptr), ref_count_(nullptr) {
         if (!owner)
             return;
-        ref_count_ = new size_t(1);
+        ref_count_ = new std::size_t(1);
         ptr_ = owner.Release();
     }
  
@@ -192,7 +188,7 @@ public:
     }
  
     // Границы не проверяются: размер массива ShrdPtr неизвестен
-    T& operator[](size_t index) const noexcept {
+    T& operator[](std::size_t index) const noexcept {
         assert(ptr_ != nullptr && "Indexing empty ShrdPtr");
         return ptr_[index];
     }
@@ -200,7 +196,7 @@ public:
     T* Get() const noexcept { return ptr_; }
     explicit operator bool() const noexcept { return ptr_ != nullptr; }
  
-    size_t UseCount() const noexcept {
+    std::size_t UseCount() const noexcept {
         return ref_count_ != nullptr ? *ref_count_ : 0;
     }
 
@@ -246,12 +242,12 @@ private:
         --(*ref_count_);
         if (*ref_count_ == 0) {
             delete ref_count_;
-            UnqPtr<T[]> owner(ptr_);  // UnqPtr<T[]> удалит массив через delete[]
+            UnqPtr<T[]> owner(ptr_);  
         }
     }
  
     T* ptr_ = nullptr;
-    size_t* ref_count_ = nullptr;
+    std::size_t* ref_count_ = nullptr;
 };
 
 // Фабричные функции (аналог std::make_shared)
@@ -264,6 +260,6 @@ requires (!std::is_array_v<T>)
 // MakeShrd<int[]>(n): массив из n элементов, заполненных нулями / конструктором по умолчанию
 template <typename T>
 requires std::is_unbounded_array_v<T>
-[[nodiscard]] ShrdPtr<T> MakeShrd(size_t size) {
+[[nodiscard]] ShrdPtr<T> MakeShrd(std::size_t size) {
     return ShrdPtr<T>(MakeUnq<T>(size));
 }

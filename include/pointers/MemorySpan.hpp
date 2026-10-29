@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstddef>   // size_t 
+#include <cstddef>   // std::size_t 
 #include <stdexcept> // исключения
 #include <utility>   // std::move(), std::exchange()
 
@@ -9,28 +9,22 @@
 #include "MsPtr.hpp"
 
 // ========== MemorySpan<T> - массив фиксированного размера ==========
-// Владеет своими элементами: хранит их в UnqPtr<T[]>, и тот удаляет их через свой деструктор.
-// Прямого доступа к элементам (span[i]) снаружи нет - только через умные указатели:
-//   Get(i)    -> UnqPtr<T>  независимая копия элемента (единоличное владение) //TODO: Расскажи максимально подробно про эти методы Get(i), Copy(i) и Locate(i). Зачем и для чего они нужны? 
-//   Copy(i)   -> ShrdPtr<T> копия элемента с разделяемым владением //TODO: Для чего конкретно нужен Get(i) и что он делает? Он возвращает 
-//   Locate(i) -> MsPtr<T>   указатель на сам элемент внутри массива, с проверкой границ
 
 template <typename T>
 class MemorySpan {
 public:
-    using ElementType = T; //TODO: А почему у нас нет "using Pointer = T*", но есть ElementType? У нас же есть поле типа UnqPtr<T[]>, которое будет выделять данные на куче 
+    using ElementType = T; 
 
     MemorySpan() noexcept = default; 
 
-    explicit MemorySpan(size_t size) : data_(MakeUnq<T[]>(size)), size_(size) {}
+    explicit MemorySpan(std::size_t size) : data_(MakeUnq<T[]>(size)), size_(size) {}
 
-    // Копия count элементов из обычного массива items
-    MemorySpan(const T* items, size_t count) {
+    MemorySpan(const T* items, std::size_t count) {
         if (items == nullptr && count > 0)
             throw std::invalid_argument("MemorySpan: items is nullptr");
         data_ = MakeUnq<T[]>(count);
         size_ = count;
-        for (size_t i = 0; i < count; ++i) 
+        for (std::size_t i = 0; i < count; ++i) 
             data_[i] = items[i];
     }
 
@@ -51,28 +45,27 @@ public:
         return *this; 
     }
 
-    // Методы доступа через умные указатели
-    UnqPtr<T> Get(size_t index) const {
+    UnqPtr<T> Get(std::size_t index) const {
         CheckIndex(index); 
-        return MakeUnq<T>(data_[index]); //TODO: Правильно ли я понимаю, что мы получаем новый UnqPtr (не массив), ptr_ которого будет равен data_[index]? При этом никакой ошибки не будет. Поскольку массив у нас UnqPtr<T[]>, а возвращаем мы UnqPtr<T> с значением T равным data_[index]. Мы не даём адрес элемента из массива, мы создаём новый UnqPtr<T> с значением как у data_[index]. Если я что-то понял не так - сообщи и объясни как правильно!
+        return MakeUnq<T>(data_[index]); 
     }
 
-    ShrdPtr<T> Copy(size_t index) const {
+    ShrdPtr<T> Copy(std::size_t index) const {
         CheckIndex(index);
         return MakeShrd<T>(data_[index]);
     }
 
     // index == Size() разрешён: это позиция "за последним" (как End()) 
-    MsPtr<T> Locate(size_t index) {
+    MsPtr<T> Locate(std::size_t index) {
         if (index > size_)
             throw std::out_of_range("MemorySpan::Locate: index is out of range");
-        return MsPtr<T>(this, index); //TODO: Вообще не понял что делает эта функция
+        return MsPtr<T>(this, index); 
     }
 
     MsPtr<T> Begin() noexcept { return MsPtr<T>(this, 0); }
     MsPtr<T> End() noexcept { return MsPtr<T>(this, size_); }
 
-    size_t Size() const noexcept { //TODO: Давай переименуем этот метод в GetSize()? Так будет логичнее, это банальный геттер.
+    std::size_t Size() const noexcept { 
         return size_;
     }
 
@@ -80,17 +73,17 @@ public:
 
 private:
     // MsPtr читает элементы через operator[], границы он проверяет сам.
-    friend class MsPtr<T>;
+    friend class MsPtr<T>; 
 
-    T& operator[](size_t index) noexcept {
+    T& operator[](std::size_t index) noexcept {
         return data_[index];
     }
 
-    void CheckIndex(size_t index) const {
+    void CheckIndex(std::size_t index) const {
         if (index >= size_)
             throw std::out_of_range("MemorySpan::CheckIndex: Index is out of range");
     }
 
     UnqPtr<T[]> data_ = nullptr;
-    size_t size_ = 0;
+    std::size_t size_ = 0;
 };

@@ -1,28 +1,22 @@
-#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
 
-#include "ArraySequence.hpp"
 #include "pointers/MemorySpan.hpp"
 #include "pointers/MsPtr.hpp"
 #include "pointers/ShrdPtr.hpp"
 #include "pointers/UnqPtr.hpp"
 
-// ============================================================================
-// Безопасный ввод
-// ============================================================================
+struct InputEnded {};
 
-// Читает строку целиком. Если ввод закончился (Ctrl+D или конец файла) — выходим,
-// иначе программа бесконечно спрашивала бы число у пустого потока.
+// Читает строку целиком. Без проверки на конец ввода программа бесконечно
+// спрашивала бы число у пустого потока
 std::string ReadLine() {
     std::string line;
-    if (!std::getline(std::cin, line)) {
-        std::cout << "\n Ввод завершён. До свидания!\n";
-        std::exit(0);
-    }
+    if (!std::getline(std::cin, line))
+        throw InputEnded();
     return line;
 }
 
@@ -50,24 +44,14 @@ int ReadInt(const std::string& prompt,
     }
 }
 
-void WaitForEnter() {
-    std::cout << "\n Нажмите Enter, чтобы продолжить...";
-    ReadLine();
-}
-
-// Адрес объекта для вывода: по нему видно, что копии ShrdPtr указывают на один объект
-const void* AddressOf(const void* ptr) {
-    return ptr;
-}
-
 // ============================================================================
-// 1. UnqPtr — единоличное владение
+// 1. UnqPtr - единоличное владение
 // ============================================================================
 
 void PrintUnqPtr(const std::string& name, const UnqPtr<int>& ptr) {
     std::cout << "   " << name << ": ";
     if (ptr)
-        std::cout << *ptr << "   (объект по адресу " << AddressOf(ptr.Get()) << ")\n";
+        std::cout << *ptr << "   (объект по адресу " << ptr.Get() << ")\n";
     else
         std::cout << "пусто\n";
 }
@@ -80,7 +64,7 @@ void UnqPtrMenu() {
         std::cout << "\n";
         std::cout << " |============== UnqPtr<int>: единоличное владение ===============|\n";
         std::cout << " |  У объекта ровно один владелец. Копировать UnqPtr нельзя       |\n";
-        std::cout << " |  (UnqPtr b = a; — ошибка компиляции), можно только переместить.|\n";
+        std::cout << " |  (UnqPtr b = a; - ошибка компиляции), можно только переместить.|\n";
         std::cout << " |================================================================|\n";
         PrintUnqPtr("a", first);
         PrintUnqPtr("b", second);
@@ -110,7 +94,7 @@ void UnqPtrMenu() {
             std::cout << " Владение передано: b стал пустым.\n";
         } else if (choice == 4) {
             if (!first) {
-                std::cout << " [!] a пуст — разыменовывать нечего.\n";
+                std::cout << " [!] a пуст - разыменовывать нечего.\n";
                 continue;
             }
             *first = ReadInt(" Новое значение: ");
@@ -124,7 +108,7 @@ void UnqPtrMenu() {
                 continue;
             }
             std::cout << " Release() вернул сырой указатель на " << *raw
-                      << ". a пуст, объект не удалён —\n"
+                      << ". a пуст, объект не удалён -\n"
                       << " теперь удалить его должны мы сами: delete raw;\n";
             delete raw;
         } else if (choice == 7) {
@@ -136,7 +120,7 @@ void UnqPtrMenu() {
 }
 
 // ============================================================================
-// 2. ShrdPtr — разделяемое владение
+// 2. ShrdPtr - разделяемое владение
 // ============================================================================
 
 const int kShrdSlots = 3;
@@ -145,8 +129,9 @@ void PrintShrdSlots(const ShrdPtr<int> slots[]) {
     for (int i = 0; i < kShrdSlots; ++i) {
         std::cout << "   [" << i << "] ";
         if (slots[i]) {
+            // Одинаковый адрес у разных ячеек = копии указывают на один объект
             std::cout << *slots[i] << "   владельцев: " << slots[i].UseCount()
-                      << "   адрес: " << AddressOf(slots[i].Get()) << "\n";
+                      << "   адрес: " << slots[i].Get() << "\n";
         } else {
             std::cout << "пусто\n";
         }
@@ -167,7 +152,7 @@ void ShrdPtrMenu() {
         std::cout << " |  1. Создать объект в ячейке     (s[i] = MakeShrd<int>(x))      |\n";
         std::cout << " |  2. Скопировать ячейку i -> j   (s[j] = s[i], счётчик + 1)     |\n";
         std::cout << " |  3. Переместить ячейку i -> j   (s[j] = std::move(s[i]))       |\n";
-        std::cout << " |  4. Изменить значение           (*s[i] = x — видно всем копиям)|\n";
+        std::cout << " |  4. Изменить значение           (*s[i] = x - видно всем копиям)|\n";
         std::cout << " |  5. Отпустить ячейку            (s[i].Reset(), счётчик - 1)    |\n";
         std::cout << " |  0. Назад                                                      |\n";
         std::cout << " |================================================================|\n";
@@ -199,114 +184,16 @@ void ShrdPtrMenu() {
             const size_t before = slots[i].UseCount();
             slots[i].Reset();
             if (before == 1)
-                std::cout << " Это был последний владелец — объект удалён.\n";
+                std::cout << " Это был последний владелец - объект удалён.\n";
         }
     }
 }
 
 // ============================================================================
-// 3. Подтипизация: коллекция фигур ArraySequence<ShrdPtr<Shape>>
+// 3. MemorySpan и MsPtr - арифметика указателей с проверкой границ
 // ============================================================================
 
-class Shape {
-public:
-    static inline int alive_count = 0;  // сколько фигур сейчас в памяти
-
-    Shape() { ++alive_count; }
-    virtual ~Shape() { --alive_count; }  // virtual: удаляем через Shape*, а объект — Circle
-
-    virtual std::string Name() const = 0;
-    virtual double Area() const = 0;
-};
-
-class Circle : public Shape {
-public:
-    explicit Circle(int radius) : radius_(radius) {}
-
-    std::string Name() const override { return "Круг, r = " + std::to_string(radius_); }
-    double Area() const override { return 3.14159265 * radius_ * radius_; }
-
-private:
-    int radius_;
-};
-
-class Rectangle : public Shape {
-public:
-    Rectangle(int width, int height) : width_(width), height_(height) {}
-
-    std::string Name() const override {
-        return "Прямоугольник " + std::to_string(width_) + " x " + std::to_string(height_);
-    }
-    double Area() const override { return static_cast<double>(width_) * height_; }
-
-private:
-    int width_;
-    int height_;
-};
-
-void PrintShapes(const ArraySequence<ShrdPtr<Shape>>& shapes) {
-    if (shapes.IsEmpty())
-        std::cout << "   (коллекция пуста)\n";
-    for (size_t i = 0; i < shapes.GetLength(); ++i) {
-        const ShrdPtr<Shape>& shape = shapes[i];
-        std::cout << "   [" << i << "] " << shape->Name() << ", площадь " << shape->Area()
-                  << "   владельцев: " << shape.UseCount()
-                  << "   адрес: " << AddressOf(shape.Get()) << "\n";
-    }
-    std::cout << "   Фигур в памяти: " << Shape::alive_count
-              << ", элементов в коллекции: " << shapes.GetLength() << "\n";
-}
-
-void ShapesMenu() {
-    ArraySequence<ShrdPtr<Shape>> shapes;
-
-    while (true) {
-        std::cout << "\n";
-        std::cout << " |========= Подтипизация: ArraySequence<ShrdPtr<Shape>> ==========|\n";
-        std::cout << " |  Circle и Rectangle — наследники Shape, поэтому                |\n";
-        std::cout << " |  UnqPtr<Circle> -> ShrdPtr<Shape> работает автоматически.      |\n";
-        std::cout << " |  Обратно (ShrdPtr<Shape> -> ShrdPtr<Circle>) не компилируется. |\n";
-        std::cout << " |================================================================|\n";
-        PrintShapes(shapes);
-        std::cout << " |----------------------------------------------------------------|\n";
-        std::cout << " |  1. Добавить круг                                              |\n";
-        std::cout << " |  2. Добавить прямоугольник                                     |\n";
-        std::cout << " |  3. Добавить копию фигуры i     (тот же объект, владельцев + 1)|\n";
-        std::cout << " |  4. Удалить элемент i           (объект живёт, пока есть копии)|\n";
-        std::cout << " |  0. Назад                                                      |\n";
-        std::cout << " |================================================================|\n";
-
-        const int choice = ReadInt(" Выбор: ", 0, 4);
-        if (choice == 0)
-            break;
-
-        if (choice == 1) {
-            UnqPtr<Circle> circle = MakeUnq<Circle>(ReadInt(" Радиус (1-100): ", 1, 100));
-            shapes.Append(std::move(circle));  // UnqPtr<Circle> -> ShrdPtr<Shape>
-        } else if (choice == 2) {
-            const int width = ReadInt(" Ширина (1-100): ", 1, 100);
-            const int height = ReadInt(" Высота (1-100): ", 1, 100);
-            ShrdPtr<Rectangle> rectangle = MakeShrd<Rectangle>(width, height);
-            shapes.Append(rectangle);  // ShrdPtr<Rectangle> -> ShrdPtr<Shape>
-        } else if (shapes.IsEmpty()) {
-            std::cout << " [!] Коллекция пуста.\n";
-        } else {
-            const int last = static_cast<int>(shapes.GetLength()) - 1;
-            const int i = ReadInt(" Номер элемента (0-" + std::to_string(last) + "): ", 0, last);
-            if (choice == 3)
-                shapes.Append(shapes[static_cast<size_t>(i)]);
-            else
-                shapes.RemoveAt(static_cast<size_t>(i));
-        }
-    }
-    // shapes уничтожается — все фигуры удаляются, Shape::alive_count снова 0
-}
-
-// ============================================================================
-// 4. MemorySpan и MsPtr — арифметика указателей с проверкой границ
-// ============================================================================
-
-// Выводит массив, текущий элемент MsPtr — в скобках > <
+// Выводит массив, текущий элемент MsPtr - в скобках > <
 void PrintSpan(MemorySpan<int>& span, const MsPtr<int>& current) {
     std::cout << "   ";
     for (MsPtr<int> ptr = span.Begin(); ptr != span.End(); ++ptr) {
@@ -357,20 +244,22 @@ void MemorySpanMenu() {
             } else if (choice == 3) {
                 ptr += ReadInt(" Смещение k (может быть отрицательным): ");
             } else if (choice == 4) {
-                std::cout << " *ptr = " << *ptr << "\n";
+                const int value = *ptr;  // сначала читаем: если бросит, строка не выведется наполовину
+                std::cout << " *ptr = " << value << "\n";
             } else if (choice == 5) {
                 const int value = ReadInt(" Новое значение: ");
                 *ptr = value;
             } else if (choice == 6) {
                 const int offset = ReadInt(" k: ");
-                std::cout << " ptr[" << offset << "] = " << ptr[offset] << "\n";
+                const int value = ptr[offset];
+                std::cout << " ptr[" << offset << "] = " << value << "\n";
             } else if (choice == 7) {
                 ptr = span.Locate(static_cast<size_t>(ReadInt(" Индекс i: ", 0)));
             } else if (choice == 8) {
                 UnqPtr<int> copy = span.Get(static_cast<size_t>(ReadInt(" Индекс i: ", 0)));
                 *copy += 1000;
                 std::cout << " Get вернул UnqPtr на копию. Изменили копию: " << *copy
-                          << " — в массиве значение прежнее.\n";
+                          << " - в массиве значение прежнее.\n";
             } else if (choice == 9) {
                 ShrdPtr<int> copy = span.Copy(static_cast<size_t>(ReadInt(" Индекс i: ", 0)));
                 ShrdPtr<int> another = copy;
@@ -396,24 +285,26 @@ int main() {
     while (true) {
         std::cout << "\n";
         std::cout << " |=========================== МЕНЮ ===============================|\n";
-        std::cout << " |  1. UnqPtr — единоличное владение                              |\n";
-        std::cout << " |  2. ShrdPtr — разделяемое владение, счётчик ссылок             |\n";
-        std::cout << " |  3. Подтипизация: коллекция фигур на ShrdPtr<Shape>            |\n";
-        std::cout << " |  4. MemorySpan и MsPtr — безопасная арифметика указателей      |\n";
+        std::cout << " |  1. UnqPtr - единоличное владение                              |\n";
+        std::cout << " |  2. ShrdPtr - разделяемое владение, счётчик ссылок             |\n";
+        std::cout << " |  3. MemorySpan и MsPtr  безопасная арифметика указателей      |\n";
         std::cout << " |  0. Выход                                                      |\n";
         std::cout << " |================================================================|\n";
 
-        const int choice = ReadInt(" Выбор: ", 0, 4);
-        if (choice == 0)
+        try {
+            const int choice = ReadInt(" Выбор: ", 0, 3);
+            if (choice == 0)
+                break;
+            else if (choice == 1)
+                UnqPtrMenu();
+            else if (choice == 2)
+                ShrdPtrMenu();
+            else if (choice == 3)
+                MemorySpanMenu();
+        } catch (const InputEnded&) {
+            std::cout << "\n Ввод завершён.\n";
             break;
-        else if (choice == 1)
-            UnqPtrMenu();
-        else if (choice == 2)
-            ShrdPtrMenu();
-        else if (choice == 3)
-            ShapesMenu();
-        else if (choice == 4)
-            MemorySpanMenu();
+        }
     }
 
     std::cout << "\n Конец программы\n";
