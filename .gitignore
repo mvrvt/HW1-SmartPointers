@@ -6,10 +6,7 @@ build/
 build-*/
 cmake-build-*/
 
-# VS Code: храним только общие настройки
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
+.vscode/
 
 # clangd
 .cache/
