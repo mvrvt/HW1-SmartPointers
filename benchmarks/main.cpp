@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Нагрузочное тестирование умных указателей ("
               << (quick ? "быстрый режим" : "полный режим") << ")\n";
     const BenchmarkConfig config = quick ? QuickConfig() : FullConfig();
-    const std::vector<Measurement> results = RunAllBenchmarks(config, std::cout);
+    const DynamicArray<Measurement> results = RunAllBenchmarks(config, std::cout);
 
     PrintTables(results, std::cout);
 

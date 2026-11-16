@@ -24,12 +24,12 @@ public:
         return (*span_)[index_];
     }
 
-    T* operator->() const { 
+    T* operator->() const {
         CheckReadable(0);
-        return std::addressof((*span_)[index_]); 
+        return std::addressof((*span_)[index_]);
     }
 
-    T& operator[](std::ptrdiff_t offset) const { 
+    T& operator[](std::ptrdiff_t offset) const {
         CheckReadable(offset);
         return (*span_)[static_cast<std::size_t>(static_cast<std::ptrdiff_t>(index_) + offset)];
     }
@@ -38,13 +38,13 @@ public:
     MsPtr& operator+=(std::ptrdiff_t offset) {
         CheckMovableForward(offset);
         index_ = static_cast<std::size_t>(static_cast<std::ptrdiff_t>(index_) + offset);
-        return *this; 
+        return *this;
     }
 
     MsPtr& operator-=(std::ptrdiff_t offset) {
         CheckMovableBack(offset);
         index_ = static_cast<std::size_t>(static_cast<std::ptrdiff_t>(index_) - offset);
-        return *this; 
+        return *this;
     }
 
     MsPtr operator+(std::ptrdiff_t offset) const {
@@ -87,7 +87,7 @@ public:
         return static_cast<std::ptrdiff_t>(index_) - static_cast<std::ptrdiff_t>(other.index_);
     }
 
-    bool operator==(const MsPtr& other) const noexcept { 
+    bool operator==(const MsPtr& other) const noexcept {
         return span_ == other.span_ && index_ == other.index_;
     }
 
@@ -95,7 +95,7 @@ public:
         return !(*this == other);
     }
 
-    bool operator<(const MsPtr& other) const { 
+    bool operator<(const MsPtr& other) const {
         CheckSameSpan(other);
         return index_ < other.index_;
     }
@@ -111,7 +111,7 @@ public:
     bool operator>=(const MsPtr& other) const {
         return !(*this < other);
     }
-    
+
     std::size_t GetIndex() const noexcept { return index_; }
     MemorySpan<T>* GetSpan() const noexcept { return span_; }
 
@@ -127,7 +127,7 @@ private:
     MsPtr(MemorySpan<T>* span, std::size_t index) noexcept : span_(span), index_(index) {}
 
     void CheckBound() const {
-        if (span_ == nullptr) 
+        if (span_ == nullptr)
             throw std::logic_error("MsPtr isn't bound to any MemorySpan");
     }
 
@@ -135,7 +135,7 @@ private:
         CheckBound();
         const std::ptrdiff_t index = static_cast<std::ptrdiff_t>(index_);
         const std::ptrdiff_t size = static_cast<std::ptrdiff_t>(span_->Size());
-        if (offset < -index || offset > size - index) 
+        if (offset < -index || offset > size - index)
             throw std::out_of_range("MsPtr moved out of MemorySpan bounds");
     }
 
@@ -161,7 +161,7 @@ private:
             throw std::invalid_argument("MsPtrs belong to different MemorySpans");
     }
 
-    MemorySpan<T>* span_ = nullptr; 
+    MemorySpan<T>* span_ = nullptr;
     std::size_t index_ = 0;
 };
 

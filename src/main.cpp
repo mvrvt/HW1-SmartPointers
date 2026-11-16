@@ -273,6 +273,50 @@ void MemorySpanMenu() {
 }
 
 // ============================================================================
+// 4. Подтипизация: указатель на наследника -> указатель на базовый класс
+// ============================================================================
+
+class Animal {
+public:
+    virtual ~Animal() { std::cout << "   ~Animal()\n"; }
+    virtual std::string Speak() const { return "..."; }
+};
+
+class Dog : public Animal {
+public:
+    ~Dog() override { std::cout << "   ~Dog()\n"; }
+    std::string Speak() const override { return "Гав!"; }
+};
+
+void SubtypingDemo() {
+    std::cout << "\n |============ Подтипизация: Dog -> Animal =======================|\n";
+    {
+        std::cout << " UnqPtr<Animal> animal = MakeUnq<Dog>();\n";
+        UnqPtr<Animal> animal = MakeUnq<Dog>();
+        std::cout << "   animal->Speak() = " << animal->Speak() << "   (вызван метод Dog)\n";
+        std::cout << " Конец блока: удаление через Animal* вызывает оба деструктора:\n";
+    }
+    {
+        std::cout << "\n ShrdPtr<Dog> dog = MakeShrd<Dog>();\n";
+        std::cout << " ShrdPtr<Animal> animal = dog;\n";
+        ShrdPtr<Dog> dog = MakeShrd<Dog>();
+        ShrdPtr<Animal> animal = dog;
+        std::cout << "   владельцев: " << dog.UseCount() << " (у dog и animal один общий счётчик)\n";
+        std::cout << "   animal->Speak() = " << animal->Speak() << "\n";
+        dog.Reset();
+        std::cout << " dog.Reset(): объект ещё жив, владельцев: " << animal.UseCount() << "\n";
+        std::cout << " Конец блока: последний владелец (animal) удаляет Dog:\n";
+    }
+    std::cout << "\n Не компилируются (такие же случаи проверяют static_assert в тестах):\n"
+              << "   ShrdPtr<Dog> d = animal;            - downcast Animal -> Dog\n"
+              << "   ShrdPtr<Animal> a = ShrdPtr<int>(); - типы не связаны наследованием\n"
+              << "   UnqPtr<Base> b(new Derived);        - у Base нет virtual ~Base()\n"
+              << "   UnqPtr<Animal[]> arr(new Dog[3]);   - у массивов подтипизации нет\n";
+    std::cout << "\n Enter - вернуться в меню...";
+    ReadLine();
+}
+
+// ============================================================================
 // Главное меню
 // ============================================================================
 
@@ -287,12 +331,13 @@ int main() {
         std::cout << " |=========================== МЕНЮ ===============================|\n";
         std::cout << " |  1. UnqPtr - единоличное владение                              |\n";
         std::cout << " |  2. ShrdPtr - разделяемое владение, счётчик ссылок             |\n";
-        std::cout << " |  3. MemorySpan и MsPtr  безопасная арифметика указателей      |\n";
+        std::cout << " |  3. MemorySpan и MsPtr - безопасная арифметика указателей      |\n";
+        std::cout << " |  4. Подтипизация: ShrdPtr<Dog> -> ShrdPtr<Animal>              |\n";
         std::cout << " |  0. Выход                                                      |\n";
         std::cout << " |================================================================|\n";
 
         try {
-            const int choice = ReadInt(" Выбор: ", 0, 3);
+            const int choice = ReadInt(" Выбор: ", 0, 4);
             if (choice == 0)
                 break;
             else if (choice == 1)
@@ -301,6 +346,8 @@ int main() {
                 ShrdPtrMenu();
             else if (choice == 3)
                 MemorySpanMenu();
+            else if (choice == 4)
+                SubtypingDemo();
         } catch (const InputEnded&) {
             std::cout << "\n Ввод завершён.\n";
             break;

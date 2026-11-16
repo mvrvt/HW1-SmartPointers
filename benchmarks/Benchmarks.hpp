@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <ostream>
 #include <string>
-#include <vector>
+#include "lab2/DynamicArray.hpp"
 
 // Один замер: один сценарий, один вариант указателя, одно количество объектов
 struct Measurement {
@@ -18,18 +18,18 @@ struct Measurement {
 };
 
 struct BenchmarkConfig {
-    std::vector<size_t> sizes;        // для create и access (каждый объект - отдельный new)
-    std::vector<size_t> large_sizes;  // для copy и traverse (до 10^8: память почти не нужна)
+    DynamicArray<size_t> sizes;        // для create и access (каждый объект - отдельный new)
+    DynamicArray<size_t> large_sizes;  // для copy и traverse (до 10^8: память почти не нужна)
 };
 
 BenchmarkConfig FullConfig();   // 10 ... 10^7 и до 10^8
 BenchmarkConfig QuickConfig();  // 10 ... 10^5 - за пару секунд, для демонстрации
 
 // Запускает все сценарии; ход работы пишет в progress
-std::vector<Measurement> RunAllBenchmarks(const BenchmarkConfig& config, std::ostream& progress);
+DynamicArray<Measurement> RunAllBenchmarks(const BenchmarkConfig& config, std::ostream& progress);
 
 // Таблицы времени и памяти в консоль
-void PrintTables(const std::vector<Measurement>& results, std::ostream& out);
+void PrintTables(const DynamicArray<Measurement>& results, std::ostream& out);
 
 // CSV-файл для построения графиков (benchmarks/plot.py)
-bool WriteCsv(const std::vector<Measurement>& results, const std::string& path);
+bool WriteCsv(const DynamicArray<Measurement>& results, const std::string& path);

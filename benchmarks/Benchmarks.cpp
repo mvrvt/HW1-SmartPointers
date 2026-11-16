@@ -5,7 +5,6 @@
 #include <iomanip>
 #include <memory>   // std::unique_ptr, std::shared_ptr - только для сравнения
 #include <string>
-#include <vector>
 
 #include "AllocationCounter.hpp"
 #include "pointers/MemorySpan.hpp"
@@ -68,8 +67,8 @@ void Release(Handle&) {}
 
 template <typename Handle, typename Make>
 Measurement MeasureCreate(const std::string& variant, size_t count, Make make) {
-    std::vector<Handle> handles;
-    handles.reserve(count);  // заранее, чтобы рост vector не попал в замер памяти
+    DynamicArray<Handle> handles;
+    handles.Reserve(count);  // заранее, чтобы рост массива не попал в замер памяти
 
     const size_t repeats = RepeatsFor(count);
     AllocationStats memory;
@@ -78,13 +77,13 @@ Measurement MeasureCreate(const std::string& variant, size_t count, Make make) {
         if (repeat == 0)
             ResetAllocationStats();
         for (size_t i = 0; i < count; ++i)
-            handles.push_back(make(static_cast<int>(i)));
+            handles.Append(make(static_cast<int>(i)));
         if (repeat == 0)
             memory = GetAllocationStats();  // всё, что выделено на N объектов
         DoNotOptimize(handles);
         for (Handle& handle : handles)
             Release(handle);
-        handles.clear();  // здесь умные указатели удаляют объекты
+        handles.Clear();  // здесь умные указатели удаляют объекты
     }
     const double total_ms = MillisecondsSince(start) / static_cast<double>(repeats);
     return MakeMeasurement("create", variant, count, total_ms, memory, count * sizeof(Handle));
@@ -96,10 +95,10 @@ Measurement MeasureCreate(const std::string& variant, size_t count, Make make) {
 
 template <typename Handle, typename Make>
 Measurement MeasureAccess(const std::string& variant, size_t count, Make make) {
-    std::vector<Handle> handles;
-    handles.reserve(count);
+    DynamicArray<Handle> handles;
+    handles.Reserve(count);
     for (size_t i = 0; i < count; ++i)
-        handles.push_back(make(static_cast<int>(i)));
+        handles.Append(make(static_cast<int>(i)));
 
     const size_t repeats = RepeatsFor(count);
     long long sum = 0;
@@ -179,7 +178,7 @@ Measurement MeasureMsPtr(size_t count, bool use_index) {
     for (size_t repeat = 0; repeat < repeats; ++repeat) {
         if (use_index) {
             for (size_t i = 0; i < count; ++i)
-                sum += begin[static_cast<ptrdiff_t>(i)];
+                sum += begin[static_cast<std::ptrdiff_t>(i)];
         } else {
             for (MsPtr<int> ptr = begin; ptr != end; ++ptr)
                 sum += *ptr;
@@ -196,48 +195,60 @@ Measurement MeasureMsPtr(size_t count, bool use_index) {
 // Запуск всех сценариев
 // ============================================================================
 
+// 10, 100, 1000, ..., max
+DynamicArray<size_t> PowersOfTen(size_t max) {
+    DynamicArray<size_t> result;
+    for (size_t count = 10; count <= max; count *= 10)
+        result.Append(count);
+    return result;
+}
+
 BenchmarkConfig FullConfig() {
     BenchmarkConfig config;
-    config.sizes = {10, 100, 1'000, 10'000, 100'000, 1'000'000, 10'000'000};
-    config.large_sizes = {10, 100, 1'000, 10'000, 100'000, 1'000'000, 10'000'000, 100'000'000};
+    config.sizes = PowersOfTen(10'000'000);
+    config.large_sizes = PowersOfTen(100'000'000);
     return config;
 }
 
 BenchmarkConfig QuickConfig() {
     BenchmarkConfig config;
-    config.sizes = {10, 100, 1000, 10000, 100000};
-    config.large_sizes = {10, 100, 1000, 10000, 100000};
+    config.sizes = PowersOfTen(100'000);
+    config.large_sizes = PowersOfTen(100'000);
     return config;
 }
 
-std::vector<Measurement> RunAllBenchmarks(const BenchmarkConfig& config, std::ostream& progress) {
-    std::vector<Measurement> results;
+DynamicArray<Measurement> RunAllBenchmarks(const BenchmarkConfig& config, std::ostream& progress) {
+    DynamicArray<Measurement> results;
+
+    // Разогрев: первый замер иначе платит за "холодный" кэш и аллокатор
+    // (на графике это был всплеск raw при N = 10). Результат не сохраняем.
+    MeasureCreate<int*>("warmup", 100'000, [](int value) { return new int(value); });
 
     for (size_t count : config.sizes) {
         progress << "  create, N = " << count << '\n';
-        results.push_back(MeasureCreate<int*>("raw", count, [](int value) { return new int(value); }));
-        results.push_back(MeasureCreate<UnqPtr<int>>("UnqPtr", count,
+        results.Append(MeasureCreate<int*>("raw", count, [](int value) { return new int(value); }));
+        results.Append(MeasureCreate<UnqPtr<int>>("UnqPtr", count,
                                                      [](int value) { return MakeUnq<int>(value); }));
-        results.push_back(MeasureCreate<std::unique_ptr<int>>("std::unique_ptr", count,
+        results.Append(MeasureCreate<std::unique_ptr<int>>("std::unique_ptr", count,
                                                               [](int value) { return std::make_unique<int>(value); }));
-        results.push_back(MeasureCreate<ShrdPtr<int>>("ShrdPtr", count,
+        results.Append(MeasureCreate<ShrdPtr<int>>("ShrdPtr", count,
                                                       [](int value) { return MakeShrd<int>(value); }));
-        results.push_back(MeasureCreate<std::shared_ptr<int>>("std::shared_ptr", count,
+        results.Append(MeasureCreate<std::shared_ptr<int>>("std::shared_ptr", count,
                                                               [](int value) { return std::shared_ptr<int>(new int(value)); }));
-        results.push_back(MeasureCreate<std::shared_ptr<int>>("std::make_shared", count,
+        results.Append(MeasureCreate<std::shared_ptr<int>>("std::make_shared", count,
                                                               [](int value) { return std::make_shared<int>(value); }));
     }
 
     for (size_t count : config.sizes) {
         progress << "  access, N = " << count << '\n';
-        results.push_back(MeasureAccess<int*>("raw", count, [](int value) { return new int(value); }));
-        results.push_back(MeasureAccess<UnqPtr<int>>("UnqPtr", count,
+        results.Append(MeasureAccess<int*>("raw", count, [](int value) { return new int(value); }));
+        results.Append(MeasureAccess<UnqPtr<int>>("UnqPtr", count,
                                                      [](int value) { return MakeUnq<int>(value); }));
-        results.push_back(MeasureAccess<std::unique_ptr<int>>("std::unique_ptr", count,
+        results.Append(MeasureAccess<std::unique_ptr<int>>("std::unique_ptr", count,
                                                               [](int value) { return std::make_unique<int>(value); }));
-        results.push_back(MeasureAccess<ShrdPtr<int>>("ShrdPtr", count,
+        results.Append(MeasureAccess<ShrdPtr<int>>("ShrdPtr", count,
                                                       [](int value) { return MakeShrd<int>(value); }));
-        results.push_back(MeasureAccess<std::shared_ptr<int>>("std::shared_ptr", count,
+        results.Append(MeasureAccess<std::shared_ptr<int>>("std::shared_ptr", count,
                                                               [](int value) { return std::make_shared<int>(value); }));
     }
 
@@ -246,16 +257,16 @@ std::vector<Measurement> RunAllBenchmarks(const BenchmarkConfig& config, std::os
     const std::shared_ptr<int> std_original = std::make_shared<int>(42);
     for (size_t count : config.large_sizes) {
         progress << "  copy, N = " << count << '\n';
-        results.push_back(MeasureCopy<int*>("raw", count, &raw_value));
-        results.push_back(MeasureCopy<ShrdPtr<int>>("ShrdPtr", count, shrd_original));
-        results.push_back(MeasureCopy<std::shared_ptr<int>>("std::shared_ptr", count, std_original));
+        results.Append(MeasureCopy<int*>("raw", count, &raw_value));
+        results.Append(MeasureCopy<ShrdPtr<int>>("ShrdPtr", count, shrd_original));
+        results.Append(MeasureCopy<std::shared_ptr<int>>("std::shared_ptr", count, std_original));
     }
 
     for (size_t count : config.large_sizes) {
         progress << "  traverse, N = " << count << '\n';
-        results.push_back(MeasureRawArray(count));
-        results.push_back(MeasureMsPtr(count, false));
-        results.push_back(MeasureMsPtr(count, true));
+        results.Append(MeasureRawArray(count));
+        results.Append(MeasureMsPtr(count, false));
+        results.Append(MeasureMsPtr(count, true));
     }
     return results;
 }
@@ -265,8 +276,8 @@ std::vector<Measurement> RunAllBenchmarks(const BenchmarkConfig& config, std::os
 // ============================================================================
 
 // Варианты сценария в том порядке, в каком они впервые встретились
-std::vector<std::string> VariantsOf(const std::vector<Measurement>& results, const std::string& scenario) {
-    std::vector<std::string> variants;
+DynamicArray<std::string> VariantsOf(const DynamicArray<Measurement>& results, const std::string& scenario) {
+    DynamicArray<std::string> variants;
     for (const Measurement& m : results) {
         if (m.scenario != scenario)
             continue;
@@ -274,21 +285,21 @@ std::vector<std::string> VariantsOf(const std::vector<Measurement>& results, con
         for (const std::string& v : variants)
             known = known || v == m.variant;
         if (!known)
-            variants.push_back(m.variant);
+            variants.Append(m.variant);
     }
     return variants;
 }
 
-std::vector<size_t> CountsOf(const std::vector<Measurement>& results, const std::string& scenario) {
-    std::vector<size_t> counts;
+DynamicArray<size_t> CountsOf(const DynamicArray<Measurement>& results, const std::string& scenario) {
+    DynamicArray<size_t> counts;
     for (const Measurement& m : results) {
-        if (m.scenario == scenario && (counts.empty() || counts.back() != m.count))
-            counts.push_back(m.count);
+        if (m.scenario == scenario && (counts.GetSize() == 0 || counts.GetLast() != m.count))
+            counts.Append(m.count);
     }
     return counts;
 }
 
-const Measurement* Find(const std::vector<Measurement>& results, const std::string& scenario,
+const Measurement* Find(const DynamicArray<Measurement>& results, const std::string& scenario,
                         const std::string& variant, size_t count) {
     for (const Measurement& m : results) {
         if (m.scenario == scenario && m.variant == variant && m.count == count)
@@ -297,10 +308,10 @@ const Measurement* Find(const std::vector<Measurement>& results, const std::stri
     return nullptr;
 }
 
-void PrintTimeTable(const std::vector<Measurement>& results, const std::string& scenario,
+void PrintTimeTable(const DynamicArray<Measurement>& results, const std::string& scenario,
                     const std::string& title, std::ostream& out) {
-    const std::vector<std::string> variants = VariantsOf(results, scenario);
-    if (variants.empty())
+    const DynamicArray<std::string> variants = VariantsOf(results, scenario);
+    if (variants.GetSize() == 0)
         return;
 
     out << "\n" << title << "\n";
@@ -321,7 +332,7 @@ void PrintTimeTable(const std::vector<Measurement>& results, const std::string& 
     }
 
     // Общее время на самом большом N - чтобы было видно и абсолютные цифры
-    const size_t largest = CountsOf(results, scenario).back();
+    const size_t largest = CountsOf(results, scenario).GetLast();
     out << std::setw(12) << "ms, max N";
     for (const std::string& variant : variants) {
         const Measurement* m = Find(results, scenario, variant, largest);
@@ -330,12 +341,12 @@ void PrintTimeTable(const std::vector<Measurement>& results, const std::string& 
     out << "\n";
 }
 
-void PrintMemoryTable(const std::vector<Measurement>& results, const std::string& scenario,
+void PrintMemoryTable(const DynamicArray<Measurement>& results, const std::string& scenario,
                       const std::string& title, std::ostream& out) {
-    const std::vector<std::string> variants = VariantsOf(results, scenario);
-    if (variants.empty())
+    const DynamicArray<std::string> variants = VariantsOf(results, scenario);
+    if (variants.GetSize() == 0)
         return;
-    const size_t largest = CountsOf(results, scenario).back();
+    const size_t largest = CountsOf(results, scenario).GetLast();
 
     out << "\n" << title << " (N = " << largest << ")\n";
     // Заголовки столбцов латиницей: setw считает байты, а русская буква - это 2 байта
@@ -359,7 +370,7 @@ void PrintMemoryTable(const std::vector<Measurement>& results, const std::string
     }
 }
 
-void PrintTables(const std::vector<Measurement>& results, std::ostream& out) {
+void PrintTables(const DynamicArray<Measurement>& results, std::ostream& out) {
     out << "\n================ ВРЕМЯ (наносекунд на один объект / одну операцию) ================\n";
     PrintTimeTable(results, "create", "create - создание и удаление N объектов", out);
     PrintTimeTable(results, "access", "access - чтение *ptr через N указателей", out);
@@ -371,7 +382,7 @@ void PrintTables(const std::vector<Measurement>& results, std::ostream& out) {
     PrintMemoryTable(results, "traverse", "traverse - массив из N int", out);
 }
 
-bool WriteCsv(const std::vector<Measurement>& results, const std::string& path) {
+bool WriteCsv(const DynamicArray<Measurement>& results, const std::string& path) {
     std::ofstream file(path);
     if (!file)
         return false;

@@ -16,24 +16,24 @@ concept SafeUpcast = std::is_same_v<std::remove_cv_t<U>, std::remove_cv_t<T>>
 template <typename T>
 class UnqPtr {
 public:
-    using ElementType = T; 
+    using ElementType = T;
     using Pointer = T*;
 
-    UnqPtr() noexcept = default;  
+    UnqPtr() noexcept = default;
     UnqPtr(std::nullptr_t) noexcept : ptr_(nullptr) {}
     template <typename U>
     requires std::convertible_to<U*, T*> && SafeUpcast<U, T>
     explicit UnqPtr(U* ptr) noexcept : ptr_(ptr) {}
-    
-    ~UnqPtr() noexcept { 
+
+    ~UnqPtr() noexcept {
         Destroy(ptr_);
     }
 
     // Запрет копирования.
-    UnqPtr(const UnqPtr&) = delete; 
+    UnqPtr(const UnqPtr&) = delete;
     UnqPtr& operator=(const UnqPtr&) = delete;
 
-    UnqPtr(UnqPtr&& other) noexcept : ptr_(other.Release()) {} 
+    UnqPtr(UnqPtr&& other) noexcept : ptr_(other.Release()) {}
 
     UnqPtr& operator=(UnqPtr&& other) noexcept {
         if (this != &other)
@@ -51,7 +51,7 @@ public:
     requires std::convertible_to<U*, T*> && SafeUpcast<U, T>
     UnqPtr& operator=(UnqPtr<U>&& other) noexcept {
         Reset(other.Release());
-        return *this; 
+        return *this;
     }
 
     UnqPtr& operator=(std::nullptr_t) noexcept {
@@ -59,21 +59,21 @@ public:
         return *this;
     }
 
-    T& operator*() const noexcept { 
+    T& operator*() const noexcept {
         assert(ptr_ != nullptr && "Dereferencing empty UnqPtr");
-        return *ptr_; 
+        return *ptr_;
     }
 
-    T* operator->() const noexcept { 
+    T* operator->() const noexcept {
         assert(ptr_ != nullptr && "Member access through empty UnqPtr");
-        return ptr_; 
+        return ptr_;
     }
 
-    T* Get() const noexcept { return ptr_; } 
+    T* Get() const noexcept { return ptr_; }
 
     explicit operator bool() const noexcept { return ptr_ != nullptr; }
 
-    [[nodiscard]] T* Release() noexcept { 
+    [[nodiscard]] T* Release() noexcept {
         T* temp = ptr_;
         ptr_ = nullptr;
         return temp;
@@ -96,7 +96,7 @@ public:
         std::swap(ptr_, other.ptr_);
     }
 
-    friend void swap(UnqPtr& l, UnqPtr& r) noexcept { 
+    friend void swap(UnqPtr& l, UnqPtr& r) noexcept {
         l.Swap(r);
     }
 
@@ -105,11 +105,11 @@ public:
 
 private:
     static void Destroy(T* ptr) noexcept {
-        static_assert(sizeof(T) > 0, "UnqPtr can't delete an incomplete type"); 
+        static_assert(sizeof(T) > 0, "UnqPtr can't delete an incomplete type");
         delete ptr;
     }
 
-    T* ptr_ = nullptr; 
+    T* ptr_ = nullptr;
 };
 
 // ========== UnqPtr<T[]> - единоличное владение динамическим массивом ==========
@@ -135,9 +135,9 @@ public:
     UnqPtr& operator=(const UnqPtr&) = delete;
 
     UnqPtr(UnqPtr&& other) noexcept : ptr_(other.Release()) {}
-    
+
     UnqPtr& operator=(UnqPtr&& other) noexcept {
-        if (this != &other) 
+        if (this != &other)
             Reset(other.Release());
         return *this;
     }
@@ -176,7 +176,7 @@ public:
     void Swap(UnqPtr& other) noexcept {
         std::swap(ptr_, other.ptr_);
     }
-    
+
     friend void swap(UnqPtr& l, UnqPtr& r) noexcept {
         l.Swap(r);
     }
@@ -193,11 +193,11 @@ private:
     T* ptr_ = nullptr;
 };
 
-// Фабричные функции (аналог std::make_unique()) 
+// Фабричные функции (аналог std::make_unique())
 template <typename T, typename... Args>
 requires (!std::is_array_v<T>)
-[[nodiscard]] UnqPtr<T> MakeUnq(Args&&... args) { 
-    return UnqPtr<T>(new T(std::forward<Args>(args)...)); 
+[[nodiscard]] UnqPtr<T> MakeUnq(Args&&... args) {
+    return UnqPtr<T>(new T(std::forward<Args>(args)...));
 }
 
 // MakeUnq<int[]>(n): массив из n элементов, заполненных нулями/конструкторами по умолчанию

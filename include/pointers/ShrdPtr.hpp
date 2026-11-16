@@ -16,7 +16,7 @@ public:
     using ElementType = T;
     using Pointer = T*;
 
-    ShrdPtr() noexcept = default; 
+    ShrdPtr() noexcept = default;
     ShrdPtr(std::nullptr_t) noexcept : ptr_(nullptr), ref_count_(nullptr) {}
 
     // Забираем объект у UnqPtr (подходит и UnqPtr<Derived> для ShrdPtr<Base>).
@@ -25,12 +25,15 @@ public:
     template <typename U>
     requires std::convertible_to<U*, T*> && SafeUpcast<U, T>
     ShrdPtr(UnqPtr<U>&& owner) : ptr_(nullptr), ref_count_(nullptr) {
-        if (!owner) 
-            return; 
+        if (!owner)
+            return;
         ref_count_ = new std::size_t(1);
         ptr_ = owner.Release();
     }
 
+    // Из сырого указателя: сначала отдаём его временному UnqPtr,
+    // дальше сработает конструктор выше. Если new для счётчика бросит,
+    // временный UnqPtr удалит объект - утечки нет.
     template <typename U>
     requires std::convertible_to<U*, T*> && SafeUpcast<U, T>
     explicit ShrdPtr(U* ptr) : ShrdPtr(UnqPtr<U>(ptr)) {}
@@ -52,21 +55,21 @@ public:
 
     template <typename U>
     requires std::convertible_to<U*, T*> && SafeUpcast<U, T>
-    ShrdPtr(ShrdPtr<U>&& other) noexcept 
+    ShrdPtr(ShrdPtr<U>&& other) noexcept
         : ptr_(std::exchange(other.ptr_, nullptr)),
           ref_count_(std::exchange(other.ref_count_, nullptr)) {}
-    
+
     ShrdPtr& operator=(ShrdPtr other) noexcept {
         Swap(other);
-        return *this; 
-    } 
+        return *this;
+    }
 
     ~ShrdPtr() noexcept {
         RemoveRef();
     }
 
     T& operator*() const noexcept {
-        assert(ptr_ != nullptr && "Dereferencing empty ShrdPtr"); 
+        assert(ptr_ != nullptr && "Dereferencing empty ShrdPtr");
         return *ptr_;
     }
 
@@ -86,23 +89,23 @@ public:
     void Reset(std::nullptr_t = nullptr) noexcept {
         ShrdPtr empty;
         Swap(empty);
-    } 
+    }
 
     template <typename U>
     requires std::convertible_to<U*, T*> && SafeUpcast<U, T>
-    void Reset(U* ptr) {    
+    void Reset(U* ptr) {
         if (ptr == ptr_) // p.Reset(p.Get()) не должен создать второй счётчик
             return;
         ShrdPtr new_owner(ptr);
         Swap(new_owner);
-    } 
+    }
 
     void Swap(ShrdPtr& other) noexcept {
         std::swap(ptr_, other.ptr_);
         std::swap(ref_count_, other.ref_count_);
     }
 
-    friend void swap(ShrdPtr& l, ShrdPtr& r) noexcept { 
+    friend void swap(ShrdPtr& l, ShrdPtr& r) noexcept {
         l.Swap(r);
     }
 
@@ -112,10 +115,10 @@ public:
 private:
     // ShrdPtr<Base> читает private-поля ShrdPtr<Derived> в конструкторах подтипизации
     template <typename U>
-    friend class ShrdPtr; 
+    friend class ShrdPtr;
 
     void AddRef() noexcept {
-        if (ref_count_ != nullptr) 
+        if (ref_count_ != nullptr)
             ++(*ref_count_);
     }
 
@@ -125,7 +128,7 @@ private:
         --(*ref_count_);
         if (*ref_count_ == 0) {
             delete ref_count_;
-            UnqPtr<T> owner(ptr_); 
+            UnqPtr<T> owner(ptr_);
         }
     }
 
@@ -140,48 +143,49 @@ class ShrdPtr<T[]> {
 public:
     using ElementType = T;  // для ShrdPtr<int[]> это int, а не int[]
     using Pointer = T*;
- 
+
     ShrdPtr() noexcept : ptr_(nullptr), ref_count_(nullptr) {}
     ShrdPtr(std::nullptr_t) noexcept : ptr_(nullptr), ref_count_(nullptr) {}
- 
+
     ShrdPtr(UnqPtr<T[]>&& owner) : ptr_(nullptr), ref_count_(nullptr) {
         if (!owner)
             return;
         ref_count_ = new std::size_t(1);
         ptr_ = owner.Release();
     }
- 
+
     // У массивов подтипизации нет: принимаем только T* (как у UnqPtr<T[]>)
     explicit ShrdPtr(T* ptr) : ShrdPtr(UnqPtr<T[]>(ptr)) {}
 
     template <typename U>
     ShrdPtr(U* ptr) = delete;  // Derived* и любой другой указатель - ошибка компиляции
- 
+
     ShrdPtr(const ShrdPtr& other) noexcept : ptr_(other.ptr_), ref_count_(other.ref_count_) {
         AddRef();
     }
- 
+
     ShrdPtr(ShrdPtr&& other) noexcept
         : ptr_(std::exchange(other.ptr_, nullptr)),
           ref_count_(std::exchange(other.ref_count_, nullptr)) {}
- 
+
     ShrdPtr& operator=(ShrdPtr other) noexcept {
         Swap(other);
         return *this;
     }
- 
+
     ~ShrdPtr() noexcept {
         RemoveRef();
     }
 
+    // Границы не проверяются: размер массива ShrdPtr неизвестен
     T& operator[](std::size_t index) const noexcept {
         assert(ptr_ != nullptr && "Indexing empty ShrdPtr");
         return ptr_[index];
     }
- 
+
     T* Get() const noexcept { return ptr_; }
     explicit operator bool() const noexcept { return ptr_ != nullptr; }
- 
+
     std::size_t UseCount() const noexcept {
         return ref_count_ != nullptr ? *ref_count_ : 0;
     }
@@ -191,7 +195,7 @@ public:
         ShrdPtr empty;
         Swap(empty);
     }
- 
+
     // Стать единственным владельцем нового массива ptr
     void Reset(T* ptr) {
         if (ptr == ptr_) // p.Reset(p.Get()) не должен создать второй счётчик
@@ -202,35 +206,35 @@ public:
 
     template <typename U>
     void Reset(U* ptr) = delete;  // только T*
- 
+
     void Swap(ShrdPtr& other) noexcept {
         std::swap(ptr_, other.ptr_);
         std::swap(ref_count_, other.ref_count_);
     }
- 
+
     friend void swap(ShrdPtr& l, ShrdPtr& r) noexcept {
         l.Swap(r);
     }
- 
+
     bool operator==(const ShrdPtr& other) const noexcept { return ptr_ == other.ptr_; }
     bool operator==(std::nullptr_t) const noexcept { return ptr_ == nullptr; }
- 
+
 private:
     void AddRef() noexcept {
         if (ref_count_ != nullptr)
             ++(*ref_count_);
     }
- 
+
     void RemoveRef() noexcept {
         if (ref_count_ == nullptr)
             return;
         --(*ref_count_);
         if (*ref_count_ == 0) {
             delete ref_count_;
-            UnqPtr<T[]> owner(ptr_);  
+            UnqPtr<T[]> owner(ptr_);
         }
     }
- 
+
     T* ptr_ = nullptr;
     std::size_t* ref_count_ = nullptr;
 };
@@ -239,7 +243,7 @@ private:
 template <typename T, typename ... Args>
 requires (!std::is_array_v<T>)
 [[nodiscard]] ShrdPtr<T> MakeShrd(Args&&... args) {
-    return ShrdPtr<T>(MakeUnq<T>(std::forward<Args>(args)...)); 
+    return ShrdPtr<T>(MakeUnq<T>(std::forward<Args>(args)...));
 }
 
 // MakeShrd<int[]>(n): массив из n элементов, заполненных нулями / конструктором по умолчанию
