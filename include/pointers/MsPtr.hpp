@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstddef>   // std::size_t, ptrdiff_t
+#include <cstddef>   // std::size_t, std::ptrdiff_t
 #include <memory>    // std::addressof
 #include <stdexcept> // std::out_of_range, std::invalid_argument, std::logic_error
 
@@ -29,31 +29,31 @@ public:
         return std::addressof((*span_)[index_]); 
     }
 
-    T& operator[](ptrdiff_t offset) const { 
+    T& operator[](std::ptrdiff_t offset) const { 
         CheckReadable(offset);
-        return (*span_)[static_cast<std::size_t>(static_cast<ptrdiff_t>(index_) + offset)];
+        return (*span_)[static_cast<std::size_t>(static_cast<std::ptrdiff_t>(index_) + offset)];
     }
 
     // (Арифметика: результат в [0, Size()], включая позицию «за последним»)
-    MsPtr& operator+=(ptrdiff_t offset) {
+    MsPtr& operator+=(std::ptrdiff_t offset) {
         CheckMovableForward(offset);
-        index_ = static_cast<std::size_t>(static_cast<ptrdiff_t>(index_) + offset);
+        index_ = static_cast<std::size_t>(static_cast<std::ptrdiff_t>(index_) + offset);
         return *this; 
     }
 
-    MsPtr& operator-=(ptrdiff_t offset) {
+    MsPtr& operator-=(std::ptrdiff_t offset) {
         CheckMovableBack(offset);
-        index_ = static_cast<std::size_t>(static_cast<ptrdiff_t>(index_) - offset);
+        index_ = static_cast<std::size_t>(static_cast<std::ptrdiff_t>(index_) - offset);
         return *this; 
     }
 
-    MsPtr operator+(ptrdiff_t offset) const {
+    MsPtr operator+(std::ptrdiff_t offset) const {
         MsPtr result = *this;
         result += offset;
         return result;
     }
 
-    MsPtr operator-(ptrdiff_t offset) const {
+    MsPtr operator-(std::ptrdiff_t offset) const {
         MsPtr result = *this;
         result -= offset;
         return result;
@@ -82,9 +82,9 @@ public:
     }
 
     // Расстояние между указателями одного MemorySpan: (it + n) - it == n.
-    ptrdiff_t operator-(const MsPtr& other) const {
+    std::ptrdiff_t operator-(const MsPtr& other) const {
         CheckSameSpan(other);
-        return static_cast<ptrdiff_t>(index_) - static_cast<ptrdiff_t>(other.index_);
+        return static_cast<std::ptrdiff_t>(index_) - static_cast<std::ptrdiff_t>(other.index_);
     }
 
     bool operator==(const MsPtr& other) const noexcept { 
@@ -131,27 +131,27 @@ private:
             throw std::logic_error("MsPtr isn't bound to any MemorySpan");
     }
 
-    void CheckMovableForward(ptrdiff_t offset) const {
+    void CheckMovableForward(std::ptrdiff_t offset) const {
         CheckBound();
-        const ptrdiff_t index = static_cast<ptrdiff_t>(index_);
-        const ptrdiff_t size = static_cast<ptrdiff_t>(span_->Size());
+        const std::ptrdiff_t index = static_cast<std::ptrdiff_t>(index_);
+        const std::ptrdiff_t size = static_cast<std::ptrdiff_t>(span_->Size());
         if (offset < -index || offset > size - index) 
             throw std::out_of_range("MsPtr moved out of MemorySpan bounds");
     }
 
-    void CheckMovableBack(ptrdiff_t offset) const {
+    void CheckMovableBack(std::ptrdiff_t offset) const {
         CheckBound();
-        const ptrdiff_t index = static_cast<ptrdiff_t>(index_);
-        const ptrdiff_t size = static_cast<ptrdiff_t>(span_->Size());
+        const std::ptrdiff_t index = static_cast<std::ptrdiff_t>(index_);
+        const std::ptrdiff_t size = static_cast<std::ptrdiff_t>(span_->Size());
         if (offset > index || offset < index - size)
             throw std::out_of_range("MsPtr moved out of MemorySpan bounds");
     }
 
     // Можно ли прочитать элемент со сдвигом offset: результат должен быть в [0, Size())
-    void CheckReadable(ptrdiff_t offset) const {
+    void CheckReadable(std::ptrdiff_t offset) const {
         CheckBound();
-        const ptrdiff_t index = static_cast<ptrdiff_t>(index_);
-        const ptrdiff_t size = static_cast<ptrdiff_t>(span_->Size());
+        const std::ptrdiff_t index = static_cast<std::ptrdiff_t>(index_);
+        const std::ptrdiff_t size = static_cast<std::ptrdiff_t>(span_->Size());
         if (offset < -index || offset >= size - index)
             throw std::out_of_range("MsPtr access out of MemorySpan bounds");
     }
@@ -168,6 +168,6 @@ private:
 
 // Оператор чтобы можно было писать MsPtr<int> a = 2 + b;
 template <typename T>
-MsPtr<T> operator+(ptrdiff_t offset, const MsPtr<T>& ptr) {
+MsPtr<T> operator+(std::ptrdiff_t offset, const MsPtr<T>& ptr) {
     return ptr + offset;
 }

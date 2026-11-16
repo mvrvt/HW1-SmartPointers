@@ -20,7 +20,8 @@ public:
     ShrdPtr(std::nullptr_t) noexcept : ptr_(nullptr), ref_count_(nullptr) {}
 
     // Забираем объект у UnqPtr (подходит и UnqPtr<Derived> для ShrdPtr<Base>).
-    // Сначала выделяем счётчик: если new бросит исключение.
+    // Сначала выделяем счётчик и только потом забираем объект: если new бросит
+    // std::bad_alloc, объект останется в owner и не потеряется.
     template <typename U>
     requires std::convertible_to<U*, T*> && SafeUpcast<U, T>
     ShrdPtr(UnqPtr<U>&& owner) : ptr_(nullptr), ref_count_(nullptr) {
@@ -30,10 +31,9 @@ public:
         ptr_ = owner.Release();
     }
 
-    // Из сырого указателя: сначала отдаём его временному UnqPtr, 
-    // дальше сработает конструктор выше. Если new для счётчика бросит,
-    // временный UnqPtr удалит объект - утечки нет. 
-    explicit ShrdPtr(T* ptr) : ShrdPtr(UnqPtr<T>(ptr)) {}
+    template <typename U>
+    requires std::convertible_to<U*, T*> && SafeUpcast<U, T>
+    explicit ShrdPtr(U* ptr) : ShrdPtr(UnqPtr<U>(ptr)) {}
 
     ShrdPtr(const ShrdPtr& other) noexcept : ptr_(other.ptr_), ref_count_(other.ref_count_) {
         AddRef();
@@ -83,13 +83,14 @@ public:
     }
 
     // Перестать владеть объектом (он удалится, если мы были последними)
-    void Reset() noexcept {
+    void Reset(std::nullptr_t = nullptr) noexcept {
         ShrdPtr empty;
         Swap(empty);
     } 
 
-    
-    void Reset(T* ptr) {
+    template <typename U>
+    requires std::convertible_to<U*, T*> && SafeUpcast<U, T>
+    void Reset(U* ptr) {    
         if (ptr == ptr_) // p.Reset(p.Get()) не должен создать второй счётчик
             return;
         ShrdPtr new_owner(ptr);
@@ -133,7 +134,7 @@ private:
 };
 
 // ========== ShrdPtr<T[]> - разделяемое владение динамическим массивом ==========
-// Подтипизации нет (как и у UnqPtr<T[]>), можно только добавить const.
+// Подтипизации нет (как и у UnqPtr<T[]>): ни Derived -> Base, ни T -> const T.
 template <typename T>
 class ShrdPtr<T[]> {
 public:
@@ -143,38 +144,24 @@ public:
     ShrdPtr() noexcept : ptr_(nullptr), ref_count_(nullptr) {}
     ShrdPtr(std::nullptr_t) noexcept : ptr_(nullptr), ref_count_(nullptr) {}
  
-    template <typename U>
-    requires std::convertible_to<U(*)[], T(*)[]>
-    ShrdPtr(UnqPtr<U[]>&& owner) : ptr_(nullptr), ref_count_(nullptr) {
+    ShrdPtr(UnqPtr<T[]>&& owner) : ptr_(nullptr), ref_count_(nullptr) {
         if (!owner)
             return;
         ref_count_ = new std::size_t(1);
         ptr_ = owner.Release();
     }
  
-    // Только T* (или T* -> const T*), но НЕ Derived*
+    // У массивов подтипизации нет: принимаем только T* (как у UnqPtr<T[]>)
+    explicit ShrdPtr(T* ptr) : ShrdPtr(UnqPtr<T[]>(ptr)) {}
+
     template <typename U>
-    requires std::convertible_to<U(*)[], T(*)[]>
-    explicit ShrdPtr(U* ptr) : ShrdPtr(UnqPtr<U[]>(ptr)) {}
+    ShrdPtr(U* ptr) = delete;  // Derived* и любой другой указатель - ошибка компиляции
  
     ShrdPtr(const ShrdPtr& other) noexcept : ptr_(other.ptr_), ref_count_(other.ref_count_) {
         AddRef();
     }
  
     ShrdPtr(ShrdPtr&& other) noexcept
-        : ptr_(std::exchange(other.ptr_, nullptr)),
-          ref_count_(std::exchange(other.ref_count_, nullptr)) {}
- 
-    // Только добавление const: ShrdPtr<int[]> -> ShrdPtr<const int[]>
-    template <typename U>
-    requires std::convertible_to<U(*)[], T(*)[]>
-    ShrdPtr(const ShrdPtr<U[]>& other) noexcept : ptr_(other.ptr_), ref_count_(other.ref_count_) {
-        AddRef();
-    }
- 
-    template <typename U>
-    requires std::convertible_to<U(*)[], T(*)[]>
-    ShrdPtr(ShrdPtr<U[]>&& other) noexcept
         : ptr_(std::exchange(other.ptr_, nullptr)),
           ref_count_(std::exchange(other.ref_count_, nullptr)) {}
  
@@ -186,8 +173,7 @@ public:
     ~ShrdPtr() noexcept {
         RemoveRef();
     }
- 
-    // Границы не проверяются: размер массива ShrdPtr неизвестен
+
     T& operator[](std::size_t index) const noexcept {
         assert(ptr_ != nullptr && "Indexing empty ShrdPtr");
         return ptr_[index];
@@ -206,14 +192,16 @@ public:
         Swap(empty);
     }
  
-    template <typename U>
-    requires std::convertible_to<U(*)[], T(*)[]>
-    void Reset(U* ptr) {
-        if (ptr == ptr_)
+    // Стать единственным владельцем нового массива ptr
+    void Reset(T* ptr) {
+        if (ptr == ptr_) // p.Reset(p.Get()) не должен создать второй счётчик
             return;
         ShrdPtr new_owner(ptr);
         Swap(new_owner);
     }
+
+    template <typename U>
+    void Reset(U* ptr) = delete;  // только T*
  
     void Swap(ShrdPtr& other) noexcept {
         std::swap(ptr_, other.ptr_);
@@ -228,9 +216,6 @@ public:
     bool operator==(std::nullptr_t) const noexcept { return ptr_ == nullptr; }
  
 private:
-    template <typename U>
-    friend class ShrdPtr;
- 
     void AddRef() noexcept {
         if (ref_count_ != nullptr)
             ++(*ref_count_);

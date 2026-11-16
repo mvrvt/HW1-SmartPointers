@@ -21,7 +21,9 @@ public:
 
     UnqPtr() noexcept = default;  
     UnqPtr(std::nullptr_t) noexcept : ptr_(nullptr) {}
-    explicit UnqPtr(T* ptr) noexcept : ptr_(ptr) {} 
+    template <typename U>
+    requires std::convertible_to<U*, T*> && SafeUpcast<U, T>
+    explicit UnqPtr(U* ptr) noexcept : ptr_(ptr) {}
     
     ~UnqPtr() noexcept { 
         Destroy(ptr_);
@@ -77,10 +79,17 @@ public:
         return temp;
     }
 
-    void Reset(T* new_ptr = nullptr) noexcept {
-        if (ptr_ == new_ptr) // p.Reset(p.Get()) не должен удалить живой объект 
+    template <typename U>
+    requires std::convertible_to<U*, T*> && SafeUpcast<U, T>
+    void Reset(U* new_ptr) noexcept {
+        if (ptr_ == new_ptr) // p.Reset(p.Get()) не должен удалить живой объект
             return;
         Destroy(std::exchange(ptr_, new_ptr));
+    }
+
+    // Reset() и Reset(nullptr) - удалить объект и стать пустым
+    void Reset(std::nullptr_t = nullptr) noexcept {
+        Destroy(std::exchange(ptr_, nullptr));
     }
 
     void Swap(UnqPtr& other) noexcept {
@@ -113,10 +122,14 @@ public:
     UnqPtr() noexcept = default;
     UnqPtr(std::nullptr_t) noexcept {}
 
-    // Только T* (или T* -> const T*), но НЕ Derived*.
+    // У массивов подтипизации нет: принимаем только T*.
+    explicit UnqPtr(T* ptr) noexcept : ptr_(ptr) {}
+
+    // Любой другой указатель (например, Derived* для UnqPtr<Base[]>) - ошибка компиляции.
+    // Без этой строки Derived* молча превратился бы в Base*, а индексация через Base*
+    // шла бы с шагом sizeof(Base) вместо sizeof(Derived).
     template <typename U>
-    requires std::convertible_to<U(*)[], T(*)[]>
-    explicit UnqPtr(U* ptr) noexcept : ptr_(ptr) {}
+    UnqPtr(U* ptr) = delete;
 
     UnqPtr(const UnqPtr&) = delete;
     UnqPtr& operator=(const UnqPtr&) = delete;
@@ -126,18 +139,6 @@ public:
     UnqPtr& operator=(UnqPtr&& other) noexcept {
         if (this != &other) 
             Reset(other.Release());
-        return *this;
-    }
-
-    // Разрешено только добавление const: UnqPtr<int[]> -> UnqPtr<const int[]>
-    template <typename U>
-    requires std::convertible_to<U(*)[], T(*)[]>
-    UnqPtr(UnqPtr<U[]>&& other) noexcept : ptr_(other.Release()) {}
-
-    template <typename U>
-    requires std::convertible_to<U(*)[], T(*)[]>
-    UnqPtr& operator=(UnqPtr<U[]>&& other) noexcept {
-        Reset(other.Release());
         return *this;
     }
 
@@ -163,17 +164,14 @@ public:
         return std::exchange(ptr_, nullptr);
     }
 
-    template <typename U>
-    requires std::convertible_to<U(*)[], T(*)[]>
-    void Reset(U* new_ptr) noexcept {
-        if (ptr_ == new_ptr)
+    void Reset(T* new_ptr = nullptr) noexcept {
+        if (ptr_ == new_ptr) // p.Reset(p.Get()) не должен удалить живой массив
             return;
         Destroy(std::exchange(ptr_, new_ptr));
     }
 
-    void Reset(std::nullptr_t = nullptr) noexcept {
-        Destroy(std::exchange(ptr_, nullptr));
-    }
+    template <typename U>
+    void Reset(U* new_ptr) = delete;  // то же, что у конструктора: только T*
 
     void Swap(UnqPtr& other) noexcept {
         std::swap(ptr_, other.ptr_);

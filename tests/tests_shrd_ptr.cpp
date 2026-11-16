@@ -4,8 +4,8 @@
 #include <string>
 #include <type_traits>
 #include <utility>
-#include <vector>
 
+#include "lab2/ArraySequence.hpp"
 #include "pointers/ShrdPtr.hpp"
 #include "pointers/UnqPtr.hpp"
 #include "test_helpers.hpp"
@@ -31,7 +31,7 @@ ShrdPtr<int> MakeEmptyShrdPtr() {
 // is_convertible_v<B, A>   - можно ли написать  A x = b;  (неявно)
 // is_assignable_v<A&, B>   - можно ли написать  a = b;
 // X&&        - "передали через std::move"
-// const X&   - "передали обычную переменную" (копия) //TODO: разве копия? Копия это когда мы копируем элемент в память и работаем с копией, а тут у нас передача элемента по ссылке
+// const X&   - "передали обычную переменную" (копия)
 // ============================================================================
 
 // Копировать и перемещать можно, и ничего из этого не бросает исключений
@@ -73,26 +73,27 @@ static_assert(std::is_convertible_v<UnqPtr<DerivedEntity>&&, ShrdPtr<BaseEntity>
 static_assert(std::is_constructible_v<ShrdPtr<BaseEntity>, DerivedEntity*>);
 
 // а всё остальное нельзя
-static_assert(!std::is_constructible_v<ShrdPtr<DerivedEntity>, const ShrdPtr<BaseEntity>&>);  // downcast
+static_assert(!std::is_constructible_v<ShrdPtr<DerivedEntity>, const ShrdPtr<BaseEntity>&>); // downcast
 static_assert(!std::is_assignable_v<ShrdPtr<DerivedEntity>&, const ShrdPtr<BaseEntity>&>);
 static_assert(!std::is_constructible_v<ShrdPtr<DerivedEntity>, UnqPtr<BaseEntity>&&>);
-static_assert(!std::is_constructible_v<ShrdPtr<UnrelatedEntity>, const ShrdPtr<BaseEntity>&>);  // не родственники
+static_assert(!std::is_constructible_v<ShrdPtr<UnrelatedEntity>, const ShrdPtr<BaseEntity>&>); // не родственники
 static_assert(!std::is_constructible_v<ShrdPtr<BaseEntity>, const ShrdPtr<PrivateDerivedEntity>&>);
-static_assert(!std::is_constructible_v<ShrdPtr<NonVirtualBase>, const ShrdPtr<NonVirtualDerived>&>);  // нет virtual ~Base()
+static_assert(!std::is_constructible_v<ShrdPtr<NonVirtualBase>, const ShrdPtr<NonVirtualDerived>&>); // нет virtual ~Base()
 static_assert(!std::is_constructible_v<ShrdPtr<NonVirtualBase>, UnqPtr<NonVirtualDerived>&&>);
+static_assert(!std::is_constructible_v<ShrdPtr<NonVirtualBase>, NonVirtualDerived*>); // и из сырого указателя
 
 // const: добавить можно, убрать нельзя
 static_assert(std::is_constructible_v<ShrdPtr<const int>, const ShrdPtr<int>&>);
 static_assert(!std::is_constructible_v<ShrdPtr<int>, const ShrdPtr<const int>&>);
 
-// Массивы: подтипизации нет, добавить const можно
+// Массивы: подтипизации нет совсем - ни Derived -> Base, ни T -> const T
 static_assert(!std::is_constructible_v<ShrdPtr<BaseEntity[]>, DerivedEntity*>);
 static_assert(!std::is_constructible_v<ShrdPtr<BaseEntity[]>, const ShrdPtr<DerivedEntity[]>&>);
 static_assert(!std::is_constructible_v<ShrdPtr<BaseEntity[]>, UnqPtr<DerivedEntity[]>&&>);
-static_assert(std::is_constructible_v<ShrdPtr<const int[]>, const ShrdPtr<int[]>&>);
-static_assert(std::is_constructible_v<ShrdPtr<const int[]>, int*>);
-static_assert(!std::is_constructible_v<ShrdPtr<int>, const ShrdPtr<int[]>&>);  // массив -> не массив
-static_assert(!std::is_constructible_v<ShrdPtr<int[]>, const ShrdPtr<int>&>);  // не массив -> массив
+static_assert(!std::is_constructible_v<ShrdPtr<const int[]>, const ShrdPtr<int[]>&>);
+static_assert(!std::is_constructible_v<ShrdPtr<const int[]>, int*>);
+static_assert(!std::is_constructible_v<ShrdPtr<int>, const ShrdPtr<int[]>&>); // массив -> не массив
+static_assert(!std::is_constructible_v<ShrdPtr<int[]>, const ShrdPtr<int>&>); // не массив -> массив
 
 // Псевдонимы типов: у массива ElementType - тип элемента, без []
 static_assert(std::is_same_v<ShrdPtr<int>::ElementType, int>);
@@ -220,14 +221,16 @@ TEST(ShrdPtrTest, CopyOfEmptyPointerIsEmpty) {
     EXPECT_EQ(copy.UseCount(), 0u);
 }
 
-TEST(ShrdPtrTest, CopiesInsideVector) {
+TEST(ShrdPtrTest, CopiesInsideSequence) {
     InstanceTracker::alive_count = 0;
     {
         ShrdPtr<InstanceTracker> original = MakeShrd<InstanceTracker>(3);
-        std::vector<ShrdPtr<InstanceTracker>> copies(5, original);  // 5 копий
-        EXPECT_EQ(original.UseCount(), 6u);
-
-        copies.clear();
+        {
+            MutableArraySequence<ShrdPtr<InstanceTracker>> copies;
+            for (int i = 0; i < 5; ++i)
+                copies.Append(original);  // 5 копий
+            EXPECT_EQ(original.UseCount(), 6u);
+        }  // здесь copies уничтожается вместе со своими копиями
         EXPECT_EQ(original.UseCount(), 1u);
         EXPECT_EQ(InstanceTracker::alive_count, 1);
     }
@@ -747,17 +750,6 @@ TEST(ShrdPtrArrayTest, SwapExchangesArrays) {
 
     first.Swap(second);
     EXPECT_EQ(first[0], 1);
-}
-
-TEST(ShrdPtrArrayTest, ConversionToConstArray) {
-    ShrdPtr<int[]> array(new int[2]{4, 5});
-    ShrdPtr<const int[]> const_array = array;
-    EXPECT_EQ(array.UseCount(), 2u);
-    EXPECT_EQ(const_array[1], 5);
-
-    ShrdPtr<const int[]> moved = std::move(array);
-    EXPECT_FALSE(array);
-    EXPECT_EQ(const_array.UseCount(), 2u);
 }
 
 TEST(ShrdPtrArrayTest, MakeShrdArrayIsFilledWithZeros) {

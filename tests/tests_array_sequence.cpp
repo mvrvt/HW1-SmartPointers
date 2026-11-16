@@ -6,10 +6,13 @@
 #include <type_traits>
 #include <utility>
 
-#include "ArraySequence.hpp"
-#include "Sequence.hpp"
+#include "lab2/ArraySequence.hpp"
+#include "lab2/DynamicArray.hpp"
 #include "pointers/UnqPtr.hpp"
 #include "test_helpers.hpp"
+
+// Контейнеры из ЛР-2: DynamicArray хранит буфер в UnqPtr<T[]>,
+// а Mutable/ImmutableArraySequence построены поверх DynamicArray.
 
 // Строки длиннее ~22 символов хранятся в куче: если строка прочитана из
 // удалённой памяти, ASan/Valgrind это заметят, а тест увидит «мусор»
@@ -17,354 +20,383 @@ std::string LongText(int number) {
     return "a long string that does not fit into SSO #" + std::to_string(number);
 }
 
-// Последовательность 10, 20, ..., count * 10
-ArraySequence<int> MakeTens(size_t count) {
-    ArraySequence<int> seq;
-    for (size_t i = 1; i <= count; ++i)
-        seq.Append(static_cast<int>(i * 10));
-    return seq;
+// Массив 10, 20, ..., count * 10
+DynamicArray<int> MakeTens(std::size_t count) {
+    DynamicArray<int> array;
+    for (std::size_t i = 1; i <= count; ++i)
+        array.Append(static_cast<int>(i * 10));
+    return array;
 }
+
+int Square(const int& x) { return x * x; }
+bool IsEven(const int& x) { return x % 2 == 0; }
+int Sum(const int& acc, const int& x) { return acc + x; }
 
 // ============================================================================
 // 0. Проверки во время компиляции
 // ============================================================================
 
-static_assert(std::is_base_of_v<Sequence<int>, ArraySequence<int>>);  // реализует интерфейс Sequence
-static_assert(std::is_copy_constructible_v<ArraySequence<int>>);      // глубокое копирование есть
-static_assert(std::is_nothrow_move_constructible_v<ArraySequence<int>>);
-static_assert(std::is_nothrow_move_assignable_v<ArraySequence<int>>);
-static_assert(!std::is_convertible_v<size_t, ArraySequence<int>>);    // explicit у конструктора из size_t
+static_assert(std::is_base_of_v<Sequence<int>, MutableArraySequence<int>>);
+static_assert(std::is_base_of_v<Sequence<int>, ImmutableArraySequence<int>>);
+static_assert(std::is_abstract_v<ArraySequence<int>>);                  // создавать нужно Mutable/Immutable
+static_assert(std::is_nothrow_move_constructible_v<DynamicArray<int>>);
+static_assert(std::is_nothrow_move_assignable_v<DynamicArray<int>>);
+static_assert(!std::is_convertible_v<std::size_t, DynamicArray<int>>);  // explicit у конструктора из size_t
 
 // ============================================================================
-// 1. Создание
+// 1. DynamicArray: создание и доступ
 // ============================================================================
 
-TEST(ArraySequenceTest, DefaultSequenceIsEmpty) {
-    ArraySequence<int> seq;
-    EXPECT_TRUE(seq.IsEmpty());
-    EXPECT_EQ(seq.GetLength(), 0u);
-    EXPECT_EQ(seq.GetCapacity(), 0u);
-    EXPECT_THROW(seq.Get(0), std::out_of_range);
-    EXPECT_THROW(seq.GetFirst(), std::out_of_range);
-    EXPECT_THROW(seq.GetLast(), std::out_of_range);
+TEST(DynamicArrayTest, DefaultArrayIsEmpty) {
+    DynamicArray<int> array;
+    EXPECT_TRUE(array.IsEmpty());
+    EXPECT_EQ(array.GetCount(), 0u);
+    EXPECT_EQ(array.GetCapacity(), 0u);
+    EXPECT_EQ(array.begin(), array.end());
 }
 
-TEST(ArraySequenceTest, SizedSequenceIsFilledWithZeros) {
-    ArraySequence<int> seq(5);
-    EXPECT_EQ(seq.GetLength(), 5u);
-    for (size_t i = 0; i < 5; ++i)
-        EXPECT_EQ(seq.Get(i), 0);
+TEST(DynamicArrayTest, SizedArrayIsFilledWithZeros) {
+    DynamicArray<int> array(5);
+    EXPECT_EQ(array.GetCount(), 5u);
+    EXPECT_EQ(array.GetCapacity(), 5u);
+    for (std::size_t i = 0; i < 5; ++i)
+        EXPECT_EQ(array[i], 0);
 }
 
-TEST(ArraySequenceTest, CreateFromArray) {
-    int items[] = {1, 2, 3};
-    ArraySequence<int> seq(items, 3);
-    EXPECT_EQ(seq.GetLength(), 3u);
-    EXPECT_EQ(seq.GetFirst(), 1);
-    EXPECT_EQ(seq.GetLast(), 3);
-
-    items[0] = 100;  // исходный массив и последовательность независимы
-    EXPECT_EQ(seq.GetFirst(), 1);
+TEST(DynamicArrayTest, FilledWithValue) {
+    DynamicArray<std::string> array(3, LongText(1));
+    EXPECT_EQ(array.GetCount(), 3u);
+    for (const std::string& item : array)
+        EXPECT_EQ(item, LongText(1));
 }
 
-TEST(ArraySequenceTest, CreateFromNullArray) {
-    EXPECT_THROW(ArraySequence<int>(nullptr, 5), std::invalid_argument);
+TEST(DynamicArrayTest, CreateFromArray) {
+    const int items[] = {1, 2, 3};
+    DynamicArray<int> array(items, 3);
+    EXPECT_EQ(array.GetCount(), 3u);
+    EXPECT_EQ(array.GetFirst(), 1);
+    EXPECT_EQ(array.GetLast(), 3);
 
-    ArraySequence<int> empty(nullptr, 0);  // ноль элементов из nullptr - допустимо
+    EXPECT_THROW(DynamicArray<int>(nullptr, 5), std::invalid_argument);
+    DynamicArray<int> empty(nullptr, 0);  // ноль элементов из nullptr - допустимо
     EXPECT_TRUE(empty.IsEmpty());
 }
 
-// ============================================================================
-// 2. Доступ к элементам
-// ============================================================================
+TEST(DynamicArrayTest, OutOfRangeAndEmptyThrow) {
+    DynamicArray<int> array = MakeTens(3);
+    EXPECT_THROW(array.Get(3), IndexOutOfRange);
+    EXPECT_THROW(array[100], IndexOutOfRange);
+    EXPECT_THROW(array.Set(3, 1), IndexOutOfRange);
+    EXPECT_THROW(array.RemoveAt(3), IndexOutOfRange);
+    EXPECT_THROW(array.InsertAt(1, 4), IndexOutOfRange);
+    EXPECT_EQ(array.GetCount(), 3u);  // массив не изменился
 
-TEST(ArraySequenceTest, GetFirstLastAndIndex) {
-    ArraySequence<int> seq = MakeTens(4);
-    EXPECT_EQ(seq.GetFirst(), 10);
-    EXPECT_EQ(seq.GetLast(), 40);
-    EXPECT_EQ(seq.Get(2), 30);
-    EXPECT_EQ(seq[1], 20);
-}
-
-TEST(ArraySequenceTest, AccessAllowsModification) {
-    ArraySequence<int> seq = MakeTens(3);
-    seq.Get(0) = 1;
-    seq.GetLast() = 3;
-    seq[1] = 2;
-    EXPECT_EQ(seq.GetFirst(), 1);
-    EXPECT_EQ(seq.Get(1), 2);
-    EXPECT_EQ(seq.Get(2), 3);
-}
-
-TEST(ArraySequenceTest, ConstSequenceCanBeRead) {
-    const ArraySequence<int> seq = MakeTens(3);
-    EXPECT_EQ(seq.Get(1), 20);
-    EXPECT_EQ(seq.GetFirst(), 10);
-    EXPECT_EQ(seq.GetLast(), 30);
-    EXPECT_EQ(seq[2], 30);
-    EXPECT_THROW(seq.Get(3), std::out_of_range);
-}
-
-TEST(ArraySequenceTest, GetOutOfRangeThrows) {
-    ArraySequence<int> seq = MakeTens(3);
-    EXPECT_THROW(seq.Get(3), std::out_of_range);  // индекс == длине
-    EXPECT_THROW(seq.Get(100), std::out_of_range);
+    DynamicArray<int> empty;
+    EXPECT_THROW(empty.GetFirst(), EmptyCollection);
+    EXPECT_THROW(empty.GetLast(), EmptyCollection);
+    EXPECT_THROW(empty.RemoveLast(), EmptyCollection);
 }
 
 // ============================================================================
-// 3. Добавление
+// 2. DynamicArray: изменение и рост буфера
 // ============================================================================
 
-TEST(ArraySequenceTest, AppendAddsToEnd) {
-    ArraySequence<int> seq;
-    seq.Append(1);
-    seq.Append(2);
-    EXPECT_EQ(seq.GetLength(), 2u);
-    EXPECT_EQ(seq.GetFirst(), 1);
-    EXPECT_EQ(seq.GetLast(), 2);
+TEST(DynamicArrayTest, CapacityGrowsTwofold) {
+    DynamicArray<int> array;
+    array.Append(1);
+    EXPECT_EQ(array.GetCapacity(), 4u);  // 0 -> 4
+    for (int i = 2; i <= 5; ++i)
+        array.Append(i);
+    EXPECT_EQ(array.GetCapacity(), 8u);  // 4 -> 8
+    for (std::size_t i = 0; i < 5; ++i)
+        EXPECT_EQ(array[i], static_cast<int>(i + 1));  // при росте элементы сохранились
 }
 
-TEST(ArraySequenceTest, AppendGrowsCapacityAndKeepsElements) {
-    ArraySequence<int> seq;
-    for (int i = 0; i < 100; ++i)
-        seq.Append(i);
+TEST(DynamicArrayTest, ReserveKeepsElements) {
+    DynamicArray<int> array = MakeTens(3);
+    array.Reserve(50);
+    EXPECT_EQ(array.GetCapacity(), 50u);
+    EXPECT_EQ(array.GetCount(), 3u);
+    EXPECT_EQ(array.GetLast(), 30);
 
-    EXPECT_EQ(seq.GetLength(), 100u);
-    EXPECT_GE(seq.GetCapacity(), 100u);
-    for (int i = 0; i < 100; ++i)
-        EXPECT_EQ(seq.Get(static_cast<size_t>(i)), i);  // после всех перевыделений ничего не потерялось
+    array.Reserve(10);  // меньше текущей ёмкости - ничего не делает
+    EXPECT_EQ(array.GetCapacity(), 50u);
 }
 
-TEST(ArraySequenceTest, CapacityDoublesWhenFull) {
-    ArraySequence<int> seq;
-    seq.Append(1);
-    EXPECT_EQ(seq.GetCapacity(), 4u);  // первое выделение - 4 элемента
+TEST(DynamicArrayTest, InsertPrependAndRemove) {
+    DynamicArray<int> array = MakeTens(3);  // 10 20 30
+    array.InsertAt(15, 1);                  // 10 15 20 30
+    array.Prepend(5);                       // 5 10 15 20 30
+    array.InsertAt(35, 5);                  // 5 10 15 20 30 35
+    EXPECT_EQ(array.GetCount(), 6u);
+    EXPECT_EQ(array[0], 5);
+    EXPECT_EQ(array[2], 15);
+    EXPECT_EQ(array.GetLast(), 35);
+
+    array.RemoveAt(0);  // 10 15 20 30 35
+    array.RemoveLast(); // 10 15 20 30
+    EXPECT_EQ(array.GetCount(), 4u);
+    EXPECT_EQ(array.GetFirst(), 10);
+    EXPECT_EQ(array.GetLast(), 30);
+}
+
+TEST(DynamicArrayTest, AppendOwnElementWithReallocation) {
+    DynamicArray<std::string> array;
     for (int i = 0; i < 4; ++i)
-        seq.Append(i);
-    EXPECT_EQ(seq.GetCapacity(), 8u);  // 5-й элемент не влез - ёмкость удвоилась
+        array.Append(LongText(i));
+    ASSERT_EQ(array.GetCount(), array.GetCapacity());  // следующий Append перевыделит буфер
+
+    array.Append(array[0]);  // ссылка на элемент старого буфера
+    EXPECT_EQ(array.GetLast(), LongText(0));
 }
 
-TEST(ArraySequenceTest, PrependAddsToBeginning) {
-    ArraySequence<int> seq = MakeTens(2);
-    seq.Prepend(5);
-    EXPECT_EQ(seq.GetLength(), 3u);
-    EXPECT_EQ(seq.Get(0), 5);
-    EXPECT_EQ(seq.Get(1), 10);
-    EXPECT_EQ(seq.Get(2), 20);
+TEST(DynamicArrayTest, ResizeAndClear) {
+    DynamicArray<int> array = MakeTens(3);
+    array.Resize(5);
+    EXPECT_EQ(array.GetCount(), 5u);
+    EXPECT_EQ(array[3], 0);  // новые элементы равны T()
+    EXPECT_EQ(array[4], 0);
+
+    array.Resize(2);
+    EXPECT_EQ(array.GetCount(), 2u);
+    EXPECT_EQ(array.GetLast(), 20);
+
+    std::size_t capacity = array.GetCapacity();
+    array.Clear();
+    EXPECT_TRUE(array.IsEmpty());
+    EXPECT_EQ(array.GetCapacity(), capacity);  // ёмкость сохраняется, как у std::vector::clear
 }
 
-TEST(ArraySequenceTest, InsertAtBeginningMiddleAndEnd) {
-    ArraySequence<std::string> seq;
-    seq.Append("B");
-    seq.Append("D");
-
-    seq.InsertAt("A", 0);  // в начало
-    seq.InsertAt("C", 2);  // в середину
-    seq.InsertAt("E", 4);  // в конец (индекс == длине - допустимо)
-
-    EXPECT_EQ(seq.GetLength(), 5u);
-    EXPECT_EQ(seq[0], "A");
-    EXPECT_EQ(seq[1], "B");
-    EXPECT_EQ(seq[2], "C");
-    EXPECT_EQ(seq[3], "D");
-    EXPECT_EQ(seq[4], "E");
+TEST(DynamicArrayTest, RangeForModifiesElements) {
+    DynamicArray<int> array = MakeTens(3);
+    for (int& item : array)
+        item *= 2;
+    EXPECT_EQ(array[0], 20);
+    EXPECT_EQ(array[2], 60);
 }
 
-TEST(ArraySequenceTest, InsertOutOfRangeThrowsAndKeepsSequence) {
-    ArraySequence<int> seq = MakeTens(2);
-    EXPECT_THROW(seq.InsertAt(1, 3), std::out_of_range);
-    EXPECT_EQ(seq.GetLength(), 2u);  // ничего не изменилось
-}
-
-// ============================================================================
-// 4. Добавление элемента этой же последовательности (seq.Append(seq[0]))
-// item - ссылка внутрь буфера; перевыделение или сдвиг не должны его испортить
-// ============================================================================
-
-TEST(ArraySequenceTest, AppendOwnElementWithReallocation) {
-    ArraySequence<std::string> seq;
-    for (int i = 0; i < 4; ++i)
-        seq.Append(LongText(i));
-    ASSERT_EQ(seq.GetLength(), seq.GetCapacity());  // буфер полон: Append перевыделит его
-
-    seq.Append(seq[0]);
-    EXPECT_EQ(seq.GetLast(), LongText(0));
-    EXPECT_EQ(seq.GetFirst(), LongText(0));
-}
-
-TEST(ArraySequenceTest, InsertOwnElementWithShift) {
-    ArraySequence<std::string> seq;
-    seq.Append(LongText(0));
-    seq.Append(LongText(1));
-    seq.Append(LongText(2));  // ёмкость 4: перевыделения не будет, только сдвиг
-
-    seq.InsertAt(seq[1], 0);
-    EXPECT_EQ(seq[0], LongText(1));
-    EXPECT_EQ(seq[1], LongText(0));
-    EXPECT_EQ(seq[2], LongText(1));
-    EXPECT_EQ(seq[3], LongText(2));
-}
-
-TEST(ArraySequenceTest, PrependOwnLastElement) {
-    ArraySequence<std::string> seq;
-    for (int i = 0; i < 4; ++i)
-        seq.Append(LongText(i));
-
-    seq.Prepend(seq.GetLast());
-    EXPECT_EQ(seq.GetFirst(), LongText(3));
-    EXPECT_EQ(seq.GetLast(), LongText(3));
-    EXPECT_EQ(seq.GetLength(), 5u);
+TEST(DynamicArrayTest, EnumeratorVisitsAllElements) {
+    DynamicArray<int> array = MakeTens(3);
+    UnqPtr<IEnumerator<int>> it(array.GetEnumerator());
+    int sum = 0;
+    while (it->MoveNext())
+        sum += it->Current();
+    EXPECT_EQ(sum, 60);
+    EXPECT_FALSE(it->MoveNext());  // после конца обход заново не начинается
 }
 
 // ============================================================================
-// 5. Удаление
+// 3. DynamicArray: копирование и перемещение
 // ============================================================================
 
-TEST(ArraySequenceTest, RemoveAtBeginningMiddleAndEnd) {
-    ArraySequence<int> seq = MakeTens(5);  // 10 20 30 40 50
+TEST(DynamicArrayTest, CopyIsDeep) {
+    DynamicArray<int> original = MakeTens(2);
+    DynamicArray<int> copy = original;
+    EXPECT_NE(copy.begin(), original.begin());  // у копии свой буфер
 
-    seq.RemoveAt(2);  // 10 20 40 50
-    EXPECT_EQ(seq.Get(2), 40);
-    seq.RemoveAt(0);  // 20 40 50
-    EXPECT_EQ(seq.GetFirst(), 20);
-    seq.RemoveAt(2);  // 20 40
-    EXPECT_EQ(seq.GetLast(), 40);
-    EXPECT_EQ(seq.GetLength(), 2u);
+    copy[0] = 999;
+    copy.Append(30);
+    EXPECT_EQ(original[0], 10);
+    EXPECT_EQ(original.GetCount(), 2u);
 }
 
-TEST(ArraySequenceTest, RemoveUntilEmpty) {
-    ArraySequence<int> seq = MakeTens(3);
-    seq.RemoveAt(0);
-    seq.RemoveAt(0);
-    seq.RemoveAt(0);
-    EXPECT_TRUE(seq.IsEmpty());
-    EXPECT_THROW(seq.RemoveAt(0), std::out_of_range);
+TEST(DynamicArrayTest, CopyAssignment) {
+    DynamicArray<int> source = MakeTens(3);
+    DynamicArray<int> target = MakeTens(1);
+    target = source;
+    EXPECT_EQ(target.GetCount(), 3u);
+    source[0] = -1;
+    EXPECT_EQ(target[0], 10);
+
+    DynamicArray<int>& same = target;  // через ссылку, иначе компилятор ругается
+    target = same;
+    EXPECT_EQ(target.GetCount(), 3u);
+    EXPECT_EQ(target.GetLast(), 30);
 }
 
-TEST(ArraySequenceTest, RemoveOutOfRangeThrows) {
-    ArraySequence<int> seq = MakeTens(2);
-    EXPECT_THROW(seq.RemoveAt(2), std::out_of_range);
-    EXPECT_EQ(seq.GetLength(), 2u);
+TEST(DynamicArrayTest, MoveConstructorTakesBuffer) {
+    DynamicArray<int> source = MakeTens(2);
+    const int* buffer = source.begin();
+
+    DynamicArray<int> destination = std::move(source);
+    EXPECT_EQ(destination.begin(), buffer);  // буфер не копировался, его забрал UnqPtr
+    EXPECT_EQ(destination[1], 20);
+    EXPECT_TRUE(source.IsEmpty());
+    EXPECT_EQ(source.GetCapacity(), 0u);
+    EXPECT_EQ(source.begin(), nullptr);
 }
 
-// ============================================================================
-// 6. Reserve и Swap
-// ============================================================================
+TEST(DynamicArrayTest, MoveAssignmentFreesOldBuffer) {
+    InstanceTracker::alive_count = 0;
+    {
+        DynamicArray<InstanceTracker> source(3);
+        DynamicArray<InstanceTracker> target(5);
+        EXPECT_EQ(InstanceTracker::alive_count, 8);
 
-TEST(ArraySequenceTest, ReserveGrowsCapacityOnly) {
-    ArraySequence<int> seq = MakeTens(3);
-    seq.Reserve(50);
-    EXPECT_EQ(seq.GetCapacity(), 50u);
-    EXPECT_EQ(seq.GetLength(), 3u);  // длина не изменилась
-    EXPECT_EQ(seq.GetLast(), 30);
+        target = std::move(source);
+        EXPECT_EQ(InstanceTracker::alive_count, 3);  // старый буфер target удалил UnqPtr
+        EXPECT_EQ(target.GetCount(), 3u);
+        EXPECT_TRUE(source.IsEmpty());
 
-    seq.Reserve(10);  // меньше текущей ёмкости - ничего не делает
-    EXPECT_EQ(seq.GetCapacity(), 50u);
+        source.Append(InstanceTracker(7));  // перемещённым объектом можно пользоваться дальше
+        EXPECT_EQ(source.GetFirst().value, 7);
+
+        DynamicArray<InstanceTracker>& same = target;
+        target = std::move(same);  // самоприсваивание ничего не ломает
+        EXPECT_EQ(target.GetCount(), 3u);
+    }
+    EXPECT_EQ(InstanceTracker::alive_count, 0);
 }
 
-TEST(ArraySequenceTest, SwapExchangesContents) {
-    ArraySequence<int> first = MakeTens(2);
-    ArraySequence<int> second = MakeTens(5);
+TEST(DynamicArrayTest, SwapExchangesBuffers) {
+    DynamicArray<int> first = MakeTens(2);
+    DynamicArray<int> second = MakeTens(5);
+    const int* first_buffer = first.begin();
 
     first.Swap(second);
-    EXPECT_EQ(first.GetLength(), 5u);
-    EXPECT_EQ(second.GetLength(), 2u);
+    EXPECT_EQ(first.GetCount(), 5u);
+    EXPECT_EQ(second.GetCount(), 2u);
+    EXPECT_EQ(second.begin(), first_buffer);
     EXPECT_EQ(first.GetLast(), 50);
     EXPECT_EQ(second.GetLast(), 20);
 }
 
 // ============================================================================
-// 7. Копирование и перемещение
+// 4. DynamicArray: время жизни элементов
 // ============================================================================
 
-TEST(ArraySequenceTest, CopyIsIndependent) {
-    ArraySequence<int> original = MakeTens(2);
-    ArraySequence<int> copy = original;
-
-    copy.Append(30);
-    copy[0] = 999;
-    EXPECT_EQ(original.GetLength(), 2u);  // оригинал не изменился
-    EXPECT_EQ(original[0], 10);
-    EXPECT_EQ(copy.GetLength(), 3u);
-}
-
-TEST(ArraySequenceTest, CopyAssignment) {
-    ArraySequence<int> source = MakeTens(3);
-    ArraySequence<int> target = MakeTens(1);
-
-    target = source;
-    EXPECT_EQ(target.GetLength(), 3u);
-    EXPECT_EQ(target.GetLast(), 30);
-
-    source[0] = -1;
-    EXPECT_EQ(target[0], 10);  // глубокая копия
-}
-
-TEST(ArraySequenceTest, SelfCopyAssignment) {
-    ArraySequence<int> seq = MakeTens(3);
-    ArraySequence<int>& same = seq;  // через ссылку, иначе компилятор ругается
-    seq = same;
-    EXPECT_EQ(seq.GetLength(), 3u);
-    EXPECT_EQ(seq.GetLast(), 30);
-}
-
-TEST(ArraySequenceTest, MoveConstructor) {
-    ArraySequence<int> source = MakeTens(2);
-    ArraySequence<int> destination = std::move(source);
-
-    EXPECT_EQ(destination.GetLength(), 2u);
-    EXPECT_EQ(destination[1], 20);
-    EXPECT_TRUE(source.IsEmpty());
-    EXPECT_EQ(source.GetCapacity(), 0u);
-}
-
-TEST(ArraySequenceTest, MoveAssignment) {
-    ArraySequence<int> source = MakeTens(3);
-    ArraySequence<int> target = MakeTens(1);
-
-    target = std::move(source);
-    EXPECT_EQ(target.GetLength(), 3u);
-    EXPECT_TRUE(source.IsEmpty());
-
-    source.Append(7);  // перемещённым объектом можно пользоваться дальше
-    EXPECT_EQ(source.GetFirst(), 7);
-}
-
-TEST(ArraySequenceTest, SelfMoveAssignment) {
-    ArraySequence<int> seq = MakeTens(3);
-    ArraySequence<int>& same = seq;
-    seq = std::move(same);
-    EXPECT_EQ(seq.GetLength(), 3u);
-    EXPECT_EQ(seq.GetLast(), 30);
-}
-
-// ============================================================================
-// 8. Время жизни элементов и полиморфизм
-// ============================================================================
-
-TEST(ArraySequenceTest, AllObjectsAreDestroyed) {
+TEST(DynamicArrayTest, StoresNonCopyableUnqPtr) {
     InstanceTracker::alive_count = 0;
     {
-        ArraySequence<InstanceTracker> seq;
+        DynamicArray<UnqPtr<InstanceTracker>> array;
         for (int i = 0; i < 10; ++i)
-            seq.Append(InstanceTracker(i));  // несколько перевыделений буфера
-        seq.RemoveAt(3);
-        ArraySequence<InstanceTracker> copy = seq;
-        EXPECT_EQ(copy.Get(3).value, 4);
+            array.Append(MakeUnq<InstanceTracker>(i));  // несколько перевыделений: элементы перемещаются
+        EXPECT_EQ(InstanceTracker::alive_count, 10);
+        for (int i = 0; i < 10; ++i)
+            EXPECT_EQ(array[static_cast<std::size_t>(i)]->value, i);
+
+        array.InsertAt(MakeUnq<InstanceTracker>(100), 0);
+        EXPECT_EQ(array.GetFirst()->value, 100);
+
+        array.RemoveAt(0);  // удалённый элемент сразу освобождает объект
+        EXPECT_EQ(InstanceTracker::alive_count, 10);
+        array.RemoveLast();
+        EXPECT_EQ(InstanceTracker::alive_count, 9);
+    }
+    EXPECT_EQ(InstanceTracker::alive_count, 0);
+}
+
+TEST(DynamicArrayTest, AllObjectsAreDestroyed) {
+    InstanceTracker::alive_count = 0;
+    {
+        DynamicArray<InstanceTracker> array;
+        for (int i = 0; i < 10; ++i)
+            array.Append(InstanceTracker(i));
+        DynamicArray<InstanceTracker> copy = array;
+        copy.Reserve(100);
+        EXPECT_EQ(copy[9].value, 9);
     }
     EXPECT_EQ(InstanceTracker::alive_count, 0);  // ни утечек, ни двойных удалений
 }
 
-TEST(ArraySequenceTest, WorksThroughSequenceInterface) {
-    // Владеем через UnqPtr<Sequence<int>>: виртуальный деструктор Sequence
-    // гарантирует, что удалится именно ArraySequence с его буфером
-    UnqPtr<Sequence<int>> seq = MakeUnq<ArraySequence<int>>();
-    seq->Append(1);
-    seq->Append(2);
-    seq->Prepend(0);
+// ============================================================================
+// 5. MutableArraySequence / ImmutableArraySequence
+// ============================================================================
 
-    EXPECT_EQ(seq->GetLength(), 3u);
-    EXPECT_EQ(seq->GetFirst(), 0);
-    EXPECT_EQ(seq->GetLast(), 2);
-    EXPECT_EQ((*seq)[1], 1);
+TEST(ArraySequenceTest, MutableAppendChangesItself) {
+    MutableArraySequence<int> seq;
+    Sequence<int>* result = seq.Append(1)->Append(2)->Prepend(0);
+    EXPECT_EQ(result, &seq);  // Mutable возвращает this
+    EXPECT_EQ(seq.GetLength(), 3u);
+    EXPECT_EQ(seq.GetFirst(), 0);
+    EXPECT_EQ(seq.GetLast(), 2);
+}
+
+TEST(ArraySequenceTest, MutableAccessByReference) {
+    const int items[] = {1, 2, 3};
+    MutableArraySequence<int> seq(items, 3);
+    seq[0] = 10;
+    for (int& item : seq)
+        item *= 2;
+    EXPECT_EQ(seq.Get(0), 20);
+    EXPECT_EQ(seq.Get(2), 6);
+    EXPECT_THROW(seq.Get(3), IndexOutOfRange);
+}
+
+TEST(ArraySequenceTest, MutableReserve) {
+    MutableArraySequence<int> seq;
+    seq.Reserve(32);
+    EXPECT_EQ(seq.GetCapacity(), 32u);
+    EXPECT_EQ(seq.GetLength(), 0u);
+}
+
+TEST(ArraySequenceTest, ImmutableReturnsNewObject) {
+    const int items[] = {1, 2};
+    ImmutableArraySequence<int> seq(items, 2);
+
+    UnqPtr<Sequence<int>> appended(seq.Append(3));
+    EXPECT_NE(appended.Get(), &seq);
+    EXPECT_EQ(seq.GetLength(), 2u);  // оригинал не изменился
+    EXPECT_EQ(appended->GetLength(), 3u);
+    EXPECT_EQ(appended->GetLast(), 3);
+}
+
+TEST(ArraySequenceTest, ImmutableErrorDoesNotLeak) {
+    InstanceTracker::alive_count = 0;
+    {
+        ImmutableArraySequence<InstanceTracker> seq;
+        UnqPtr<Sequence<InstanceTracker>> one(seq.Append(InstanceTracker(1)));
+        const int alive_before = InstanceTracker::alive_count;  // все ячейки буфера (new T[capacity])
+
+        EXPECT_THROW(one->InsertAt(InstanceTracker(2), 5), IndexOutOfRange);
+        EXPECT_THROW(one->RemoveAt(1), IndexOutOfRange);
+        EXPECT_EQ(InstanceTracker::alive_count, alive_before);  // копия при ошибке не создавалась
+    }
+    EXPECT_EQ(InstanceTracker::alive_count, 0);
+}
+
+TEST(ArraySequenceTest, CreateFromDynamicArray) {
+    DynamicArray<int> array = MakeTens(3);
+    MutableArraySequence<int> seq(array);
+    array[0] = -1;
+    EXPECT_EQ(seq.GetLength(), 3u);
+    EXPECT_EQ(seq[0], 10);  // последовательность хранит свою копию
+}
+
+TEST(ArraySequenceTest, MapWhereReduceConcat) {
+    const int items[] = {1, 2, 3, 4};
+    MutableArraySequence<int> seq(items, 4);
+
+    UnqPtr<Sequence<int>> squares(seq.Map(Square));
+    EXPECT_EQ(squares->GetLast(), 16);
+
+    UnqPtr<Sequence<int>> even(seq.Where(IsEven));
+    EXPECT_EQ(even->GetLength(), 2u);
+    EXPECT_EQ(even->GetFirst(), 2);
+
+    EXPECT_EQ(seq.Reduce(Sum, 0), 10);
+
+    UnqPtr<Sequence<int>> joined(seq.Concat(*even));
+    EXPECT_EQ(joined->GetLength(), 6u);
+    EXPECT_EQ(joined->GetLast(), 4);
+
+    UnqPtr<Sequence<int>> middle(seq.GetSubsequence(1, 2));
+    EXPECT_EQ(middle->GetLength(), 2u);
+    EXPECT_EQ(middle->GetFirst(), 2);
+}
+
+TEST(ArraySequenceTest, CopyIsIndependentAndNoLeaks) {
+    InstanceTracker::alive_count = 0;
+    {
+        MutableArraySequence<InstanceTracker> original;
+        for (int i = 0; i < 10; ++i)
+            original.Append(InstanceTracker(i));
+        MutableArraySequence<InstanceTracker> copy = original;
+        copy.RemoveAt(0);
+        copy[0].value = 999;
+        EXPECT_EQ(original.GetLength(), 10u);
+        EXPECT_EQ(original[1].value, 1);
+        EXPECT_EQ(copy.GetLength(), 9u);
+    }
+    EXPECT_EQ(InstanceTracker::alive_count, 0);
 }

@@ -34,7 +34,6 @@ public:
     MemorySpan(const MemorySpan&) = delete;
     MemorySpan& operator=(const MemorySpan&) = delete; 
 
-    // Move semantics
     // MsPtr, привязанные к источнику, после этого видят пустой массив и при любом обращении бросают out_of_range, а не читают чужую память.
     MemorySpan(MemorySpan&& other) noexcept 
         : data_(std::move(other.data_)), size_(std::exchange(other.size_, 0)) {}

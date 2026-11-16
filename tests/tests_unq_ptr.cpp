@@ -57,22 +57,27 @@ static_assert(!std::is_convertible_v<UnqPtr<int>, bool>);
 // Подтипизация: Derived -> Base можно, всё остальное нельзя
 static_assert(std::is_constructible_v<UnqPtr<BaseEntity>, UnqPtr<DerivedEntity>&&>);
 static_assert(std::is_assignable_v<UnqPtr<BaseEntity>&, UnqPtr<DerivedEntity>&&>);
-static_assert(!std::is_constructible_v<UnqPtr<DerivedEntity>, UnqPtr<BaseEntity>&&>);     // downcast
+static_assert(!std::is_constructible_v<UnqPtr<DerivedEntity>, UnqPtr<BaseEntity>&&>); // downcast
 static_assert(!std::is_assignable_v<UnqPtr<DerivedEntity>&, UnqPtr<BaseEntity>&&>);
-static_assert(!std::is_constructible_v<UnqPtr<UnrelatedEntity>, UnqPtr<BaseEntity>&&>);  // не родственники
+static_assert(!std::is_constructible_v<UnqPtr<UnrelatedEntity>, UnqPtr<BaseEntity>&&>); // не родственники
 static_assert(!std::is_constructible_v<UnqPtr<BaseEntity>, UnqPtr<PrivateDerivedEntity>&&>);
-static_assert(!std::is_constructible_v<UnqPtr<BaseEntity>, UnqPtr<DerivedEntity>&>);      // без move
-static_assert(!std::is_constructible_v<UnqPtr<NonVirtualBase>, UnqPtr<NonVirtualDerived>&&>);  // нет virtual ~Base()
+static_assert(!std::is_constructible_v<UnqPtr<BaseEntity>, UnqPtr<DerivedEntity>&>); // без move
+static_assert(!std::is_constructible_v<UnqPtr<NonVirtualBase>, UnqPtr<NonVirtualDerived>&&>); // нет virtual ~Base()
 static_assert(!std::is_assignable_v<UnqPtr<NonVirtualBase>&, UnqPtr<NonVirtualDerived>&&>);
+static_assert(!std::is_constructible_v<UnqPtr<NonVirtualBase>, NonVirtualDerived*>); // и из сырого указателя
+static_assert(std::is_constructible_v<UnqPtr<BaseEntity>, DerivedEntity*>);          // с virtual ~Base() можно
 
 // const: добавить можно, убрать нельзя
 static_assert(std::is_constructible_v<UnqPtr<const int>, UnqPtr<int>&&>);
 static_assert(!std::is_constructible_v<UnqPtr<int>, UnqPtr<const int>&&>);
 
-// Массивы: Derived* в UnqPtr<Base[]> нельзя, добавить const можно
+// Массивы: подтипизации нет совсем - ни Derived -> Base, ни T -> const T
 static_assert(!std::is_constructible_v<UnqPtr<BaseEntity[]>, DerivedEntity*>);
 static_assert(!std::is_constructible_v<UnqPtr<BaseEntity[]>, UnqPtr<DerivedEntity[]>&&>);
-static_assert(std::is_constructible_v<UnqPtr<const int[]>, UnqPtr<int[]>&&>);
+static_assert(!std::is_assignable_v<UnqPtr<BaseEntity[]>&, UnqPtr<DerivedEntity[]>&&>);
+static_assert(!std::is_constructible_v<UnqPtr<const int[]>, UnqPtr<int[]>&&>);
+static_assert(!std::is_constructible_v<UnqPtr<const int[]>, int*>);
+static_assert(std::is_constructible_v<UnqPtr<int[]>, int*>);              // T* - можно
 static_assert(!std::is_constructible_v<UnqPtr<int>, UnqPtr<int[]>&&>);  // массив -> не массив
 
 // Псевдонимы типов: у массива ElementType - тип элемента, без []
@@ -459,13 +464,6 @@ TEST(UnqPtrArrayTest, SwapExchangesArrays) {
     swap(first, second);
     EXPECT_EQ(first[0], 2);
     EXPECT_EQ(second[0], 1);
-}
-
-TEST(UnqPtrArrayTest, MoveIntoConstArray) {
-    UnqPtr<int[]> array(new int[2]{4, 5});
-    UnqPtr<const int[]> const_array = std::move(array);
-    EXPECT_FALSE(array);
-    EXPECT_EQ(const_array[1], 5);
 }
 
 TEST(UnqPtrArrayTest, MakeUnqArrayIsFilledWithZeros) {
